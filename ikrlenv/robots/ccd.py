@@ -36,7 +36,7 @@ def FK(angle, link):
     return P
 
 
-def IK(target, angle, link, max_iter = 10000, err_min = 0.1):
+def ccd(target, angle, link, max_iter = 10000, err_min = 0.1):
     solved = False
     err_end_to_target = math.inf
     

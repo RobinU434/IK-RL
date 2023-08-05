@@ -1,28 +1,49 @@
 import numpy as np
+from abc import ABC, abstractmethod
 
 
-class BaseTask:
+class BaseTask(ABC):
+    """Base class for any Task you want ot submit to the plane robot environment
+
+    """
     def __init__(self, epsilon: float = 0.01, n_time_steps: int = 200) -> None:
         self._epsilon = epsilon
+        """float tolerance between target and action outcome"""
         self._n_time_steps = n_time_steps
-
+        """int: maximum number of time steps for an episode"""
         self._step_counter = 0
+        """int: counter how often self.reward was called"""
 
-    def update(self):
+    def _update(self):
         self._step_counter += 1
 
     def reset(self):
          self._step_counter = 0
 
-    def reward(self, *args):
-        self.update()
-        return self._reward(*args)
+    def reward(self, *args, **kwargs) -> float:
+        """returns reward of reward
 
-    def _reward(self, *args):
+        Returns:
+            float: calls self._reward 
+        """
+        self._update()
+        return self._reward(*args, **kwargs)
+
+    @abstractmethod
+    def _reward(self, *args) -> float:
+        """custom reward definition"""
         raise NotImplementedError
 
-    def done(self):
-        """implementes exceeded time limit
+    def done(self, *args, **kwargs) -> bool:
+        """definition of done. Either Episode exceeds time limit or 
+
+        Returns:
+            bool: if episode is done or not
+        """
+        return self._exceeds_time_level() or self._done(*args, **kwargs)
+    
+    def _exceeds_time_level(self) -> bool:
+        """returns true if update was called more often than 
 
         Returns:
             bool: if time limit was exceeded
@@ -30,3 +51,10 @@ class BaseTask:
         if self._step_counter >= self._n_time_steps:
             return True
         return False
+    
+    @abstractmethod
+    def _done(self, *args, **kwargs) -> bool:
+        """custom definition of done by task
+        """
+        raise NotImplementedError
+
