@@ -6,9 +6,14 @@ from ikrlenv.robots.robot_arm import RobotArm
 
 class ImitationTask(BaseTask):
     def __init__(
-        self, n_joints: int, n_time_steps: int, order: float = 2, epsilon: float = 0.01
+        self,
+        n_joints: int,
+        n_time_steps: int,
+        order: float = 2,
+        epsilon: float = 0.01,
+        **kwargs
     ) -> None:
-        super().__init__(epsilon, n_time_steps)
+        super().__init__(epsilon, n_time_steps, **kwargs)
 
         self._robot_arm = RobotArm(n_joints)
         self._target_pos = np.zeros(2)
@@ -16,10 +21,11 @@ class ImitationTask(BaseTask):
 
         self._order = order
 
-
-    def _reward(self, target_position: ndarray, robot_arm_angles: ndarray, **kwargs) -> float:
+    def _reward(
+        self, target_position: ndarray, robot_arm_angles: ndarray, **kwargs
+    ) -> float:
         if (target_position != self._target_pos).any():
-           self._update_target_angles(target_position)
+            self._update_target_angles(target_position)
 
         # TODO: make env easier
         # self.target_angles = np.zeros_like(self.target_angles)
@@ -36,7 +42,7 @@ class ImitationTask(BaseTask):
         ).mean()
 
         return loss
-    
+
     def _update_target_angles(self, target_position: ndarray):
         # new target position
         self._target_pos = target_position

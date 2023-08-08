@@ -6,7 +6,7 @@ class BaseTask(ABC):
     """Base class for any Task you want ot submit to the plane robot environment
 
     """
-    def __init__(self, epsilon: float = 0.01, n_time_steps: int = 200) -> None:
+    def __init__(self, epsilon: float = 0.01, n_time_steps: int = 200, **kwargs) -> None:
         self._epsilon = epsilon
         """float tolerance between target and action outcome"""
         self._n_time_steps = n_time_steps

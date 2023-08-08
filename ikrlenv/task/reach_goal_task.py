@@ -1,12 +1,15 @@
 import numpy as np
 from numpy import ndarray
-from envs.task.base_task import BaseTask
+from ikrlenv.task.base_task import BaseTask
 
 
 class ReachGoalTask(BaseTask):
-    def __init__(self, epsilon: float, n_time_steps: int, n_joints: int, bonus: int = 0) -> None:
-        super().__init__(epsilon, n_time_steps)
-        self._normalization_factor = 1 / (n_joints * 2)
+    def __init__(self, epsilon: float, n_time_steps: int, n_joints: int, bonus: int = 0, normalize: bool = True, **kwargs) -> None:
+        super().__init__(epsilon, n_time_steps, **kwargs)
+        if normalize:
+            self._normalization_factor = 1 / (n_joints * 2)
+        else:
+            self._normalization_factor = 1
         """float: to fit the mean distance value into the interval [0, 1]. Defaults to 1.0."""
         self._bonus = bonus
         """float: bonus if arm reached target position"""
