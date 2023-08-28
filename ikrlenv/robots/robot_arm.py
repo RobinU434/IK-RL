@@ -73,7 +73,7 @@ class RobotArm:
         res_angles, error, solved, num_iter = ccd(target, rel_angles, link, max_iter=max_iter, err_min=error_min)
 
         # convert relative resulting angles (re_angles) into absolute angles
-        abs_angles = np.array(res_angles).cumsum() / 180 * np.pi
+        abs_angles = np.deg2rad(np.array(res_angles).cumsum())
         self.set(abs_angles)
 
         return error, solved, num_iter
