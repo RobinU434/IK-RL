@@ -2,7 +2,7 @@ from typing import Tuple
 import numpy as np
 from numpy import ndarray
 
-from ikrlenv.robots.ccd import ccd
+from ikrlenv.solver.ccd import ccd
 
 
 class RobotArm:
