@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 
 
 class BaseTask(ABC):
-    """Base class for any Task you want ot submit to the plane robot environment
+    """Base class for any Task you want ot submit to the plane robot environment"""
 
-    """
-    def __init__(self, epsilon: float = 0.01, n_time_steps: int = 200, **kwargs) -> None:
+    def __init__(
+        self, epsilon: float = 0.01, n_time_steps: int = 200, **kwargs
+    ) -> None:
         self._epsilon = epsilon
         """float tolerance between target and action outcome"""
         self._n_time_steps = n_time_steps
@@ -18,13 +19,13 @@ class BaseTask(ABC):
         self._step_counter += 1
 
     def reset(self):
-         self._step_counter = 0
+        self._step_counter = 0
 
     def reward(self, *args, **kwargs) -> float:
         """returns reward of reward
 
         Returns:
-            float: calls self._reward 
+            float: calls self._reward
         """
         self._update()
         return self._reward(*args, **kwargs)
@@ -35,15 +36,15 @@ class BaseTask(ABC):
         raise NotImplementedError
 
     def done(self, *args, **kwargs) -> bool:
-        """definition of done. Either Episode exceeds time limit or 
+        """definition of done. Either Episode exceeds time limit or
 
         Returns:
             bool: if episode is done or not
         """
         return self._exceeds_time_level() or self._done(*args, **kwargs)
-    
+
     def _exceeds_time_level(self) -> bool:
-        """returns true if update was called more often than 
+        """returns true if update was called more often than
 
         Returns:
             bool: if time limit was exceeded
@@ -51,10 +52,8 @@ class BaseTask(ABC):
         if self._step_counter >= self._n_time_steps:
             return True
         return False
-    
+
     @abstractmethod
     def _done(self, *args, **kwargs) -> bool:
-        """custom definition of done by task
-        """
+        """custom definition of done by task"""
         raise NotImplementedError
-
