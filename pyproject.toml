@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "ik-rl"
+version = "0.1.0"
+description = ""
+authors = ["Robin Uhrich <robin.uhrich@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.26.4"
+torch = "^2.2.1"
+gymnasium = "^0.29.1"
+matplotlib = "^3.8.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
