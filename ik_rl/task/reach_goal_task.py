@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import ndarray
-from ikrlenv.task import NUM_TIME_STEPS
-from ikrlenv.task.base_task import BaseTask
+from ik_rl.task import NUM_TIME_STEPS
+from ik_rl.task.base_task import BaseTask
 
 
 class ReachGoalTask(BaseTask):

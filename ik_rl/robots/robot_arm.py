@@ -1,14 +1,15 @@
-from typing import Tuple
+from typing import Any, Dict, Tuple
 import numpy as np
 from numpy import ndarray
+from ik_rl.solver.base_solver import IKSolver
 
-from ikrlenv.solver.ccd import ccd
+from ik_rl.solver.ccd import ccd
 
 
 class RobotArm:
     """implementation of a robt arm in 2D space."""
 
-    def __init__(self, n_joints: int = 1, segment_length: float = 1) -> None:
+    def __init__(self, n_joints: int = 1, segment_length: float = 1, solver: type = None, solver_args: Dict[str, Any] = {}) -> None:
         self._n_joints = n_joints
         self._segment_length = segment_length
 
@@ -21,6 +22,8 @@ class RobotArm:
         )  # 2D, the plus one dim is the origin
         # init _positions
         self.set(self._angles)
+        
+        self._solver: IKSolver = solver(self, **solver_args)
 
     def reset(self):
         self._angles = np.zeros((self._n_joints))
@@ -69,19 +72,15 @@ class RobotArm:
         rel_angles = rel_angles / np.pi * 180
         rel_angles[1:] -= rel_angles[:-1].copy()
 
-        # link is a sequence of individual segment lengths
-        # in our implementation the segment length is constant over all segments
-        link = np.ones(self.n_joints) * self._segment_length
-
-        res_angles, error, solved, num_iter = ccd(
-            target, rel_angles, link, max_iter=max_iter, err_min=error_min
-        )
+        res_angles = self._solver.solve(angles=rel_angles, target=target)
+        error = self._solver.dist_error
+        solved = self._solver.solved
 
         # convert relative resulting angles (re_angles) into absolute angles
         abs_angles = np.deg2rad(np.array(res_angles).cumsum())
         self.set(abs_angles)
 
-        return error, solved, num_iter
+        return error, solved
 
     @property
     def angles(self):

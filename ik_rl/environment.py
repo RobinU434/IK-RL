@@ -4,9 +4,9 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import torch
 from gymnasium import spaces
-from ikrlenv.robots.robot_arm import RobotArm
-from ikrlenv.task.base_task import BaseTask
-from ikrlenv.utils.sample_target import sample_target
+from ik_rl.robots.robot_arm import RobotArm
+from ik_rl.task.base_task import BaseTask
+from ik_rl.utils.sample_target import sample_target
 from numpy import ndarray
 from PIL import Image, ImageDraw
 
@@ -100,25 +100,6 @@ class PlaneRobotEnv(gym.Env):
             (target_position, arm_end_position, self._robot_arm.angles)
         )
 
-        # TODO: make env easier
-        # obs = np.concatenate([
-        #     np.ones(2), np.zeros(4)
-        # ])
-
-        # TODO: make env easier
-        # obs = np.concatenate([
-        #     target_position,
-        #     np.zeros_like(arm_end_position),
-        #     np.zeros_like(self._robot_arm.angles)
-        #     ])
-
-        # TODO: make env easier
-        # obs = np.concatenate([
-        #     target_position,
-        #     arm_end_position,
-        #     np.zeros_like(self._robot_arm.angles)
-        #     ])
-
         return obs
 
     def reset(self, target_position: ndarray = None) -> ndarray:  # type: ignore
@@ -136,9 +117,8 @@ class PlaneRobotEnv(gym.Env):
         self._step_counter = 0
 
         if target_position is None or len(target_position) != 2:
-            logging.info(
-                f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
-            )
+            msg = f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
+            logging.info(msg)
             self._target_position = self._get_target_position(
                 self._robot_arm.arm_length
             )

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import inspect
 
-from ikrlenv.task import NUM_TIME_STEPS
+from ik_rl.task import NUM_TIME_STEPS
 
 
 class BaseTask(ABC):

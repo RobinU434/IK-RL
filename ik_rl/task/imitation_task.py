@@ -1,8 +1,8 @@
 import numpy as np
 from numpy import ndarray
-from ikrlenv.task import NUM_TIME_STEPS
-from ikrlenv.task.base_task import BaseTask
-from ikrlenv.robots.robot_arm import RobotArm
+from ik_rl.task import NUM_TIME_STEPS
+from ik_rl.task.base_task import BaseTask
+from ik_rl.robots.robot_arm import RobotArm
 
 
 class ImitationTask(BaseTask):
