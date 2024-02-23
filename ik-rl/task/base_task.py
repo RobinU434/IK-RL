@@ -1,12 +1,14 @@
-import numpy as np
 from abc import ABC, abstractmethod
+import inspect
+
+from ikrlenv.task import NUM_TIME_STEPS
 
 
 class BaseTask(ABC):
     """Base class for any Task you want ot submit to the plane robot environment"""
 
     def __init__(
-        self, epsilon: float = 0.01, n_time_steps: int = 200, **kwargs
+        self, epsilon: float = 0.01, n_time_steps: int = NUM_TIME_STEPS, **kwargs
     ) -> None:
         self._epsilon = epsilon
         """float tolerance between target and action outcome"""
@@ -14,6 +16,12 @@ class BaseTask(ABC):
         """int: maximum number of time steps for an episode"""
         self._step_counter = 0
         """int: counter how often self.reward was called"""
+
+        # update docstring for each method
+        _update_docstring = inspect.getdoc(self._reward)
+        self.reward.__doc__ = _update_docstring
+        _update_docstring = inspect.getdoc(self._done)
+        self.done.__doc__ = _update_docstring
 
     def _update(self):
         self._step_counter += 1

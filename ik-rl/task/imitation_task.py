@@ -1,5 +1,6 @@
 import numpy as np
 from numpy import ndarray
+from ikrlenv.task import NUM_TIME_STEPS
 from ikrlenv.task.base_task import BaseTask
 from ikrlenv.robots.robot_arm import RobotArm
 
@@ -8,7 +9,7 @@ class ImitationTask(BaseTask):
     def __init__(
         self,
         n_joints: int,
-        n_time_steps: int,
+        n_time_steps: int = NUM_TIME_STEPS,
         order: float = 2,
         epsilon: float = 0.01,
         **kwargs
@@ -24,17 +25,17 @@ class ImitationTask(BaseTask):
     def _reward(
         self, target_position: ndarray, robot_arm_angles: ndarray, **kwargs
     ) -> float:
+        """_summary_
+
+        Args:
+            target_position (ndarray): _description_
+            robot_arm_angles (ndarray): _description_
+
+        Returns:
+            float: _description_
+        """
         if (target_position != self._target_pos).any():
             self._update_target_angles(target_position)
-
-        # TODO: make env easier
-        # self.target_angles = np.zeros_like(self.target_angles)
-
-        # TODO: make env easier
-        # if np.linalg.norm(target_position) > 1:
-        #     self.target_angles = np.zeros_like(self.target_angles)
-        # else:
-        #     self.target_angles = np.ones_like(self.target_angles) * 0.5
 
         # MSE between target angles and current arm angles
         loss = -np.power(

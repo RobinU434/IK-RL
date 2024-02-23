@@ -1,10 +1,9 @@
 import logging
 from typing import Any, Dict, Tuple
 
-import gym
 import numpy as np
 import torch
-from gym import spaces
+from gymnasium import spaces
 from ikrlenv.robots.robot_arm import RobotArm
 from ikrlenv.task.base_task import BaseTask
 from ikrlenv.utils.sample_target import sample_target
@@ -20,7 +19,7 @@ class PlaneRobotEnv(gym.Env):
         segment_length: float = 1,
         discrete_mode: bool = False,
         action_mode: str = "strategic",
-        **kwargs
+        **kwargs,
     ) -> None:
         self._task = task
         self._robot_arm: RobotArm = RobotArm(n_joints, segment_length)
@@ -137,7 +136,9 @@ class PlaneRobotEnv(gym.Env):
         self._step_counter = 0
 
         if target_position is None or len(target_position) != 2:
-            logging.info(f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}")
+            logging.info(
+                f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
+            )
             self._target_position = self._get_target_position(
                 self._robot_arm.arm_length
             )

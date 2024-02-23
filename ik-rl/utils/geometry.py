@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import ndarray
 
+
 def unit_vector(vector: ndarray) -> ndarray:
     """Returns the unit vector of the vector."""
     return vector / np.linalg.norm(vector)
