@@ -27,7 +27,7 @@ def test_properties_imitation_task():
     assert reward == 0
     reward = task.reward(target_position=np.array([0, 0]), robot_arm_angles=np.zeros(2))
     assert reward == np.pi**2 / -2
-    
+
     assert task.step_counter == 2
 
     assert task.done(np.array([2, 0]), np.array([2, 0]))

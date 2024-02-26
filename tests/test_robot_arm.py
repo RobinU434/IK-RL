@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ik_rl.robots.robot_arm import RobotArm2D, RobotArm3D
+from ik_rl.robots.robot_arm import RobotArm2D
 from ik_rl.solver.ccd import CCD
 
 
@@ -63,7 +63,7 @@ def test_foreward_kinematics():
         print("orientation: ", ori)
         np.testing.assert_allclose(pos, np.array([idx, 0]), atol=1e-10)
         np.testing.assert_allclose(ori, np.eye(2), atol=1e-10)
-    
+
     angles = np.zeros(num_links)
     angles[0] = np.pi / 2
     positions, orientations = robot.forward(angles)
@@ -76,9 +76,10 @@ def test_foreward_kinematics():
             np.testing.assert_allclose(ori, np.eye(2), atol=1e-10)
         else:
             np.testing.assert_allclose(ori, expected_orientation, atol=1e-10)
-            
+
 
 def test_inverse_kinematics():
     num_links = 4
     links = np.ones(num_links)
     robot = RobotArm2D(links=links, solver_cls=CCD)
+    robot.backward(np.zeros(2))
