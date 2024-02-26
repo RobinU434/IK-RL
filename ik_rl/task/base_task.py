@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import inspect
 
 from ik_rl.task import NUM_TIME_STEPS
 
@@ -16,12 +15,6 @@ class BaseTask(ABC):
         """int: maximum number of time steps for an episode"""
         self._step_counter = 0
         """int: counter how often self.reward was called"""
-
-        # update docstring for each method
-        _update_docstring = inspect.getdoc(self._reward)
-        self.reward.__doc__ = _update_docstring
-        _update_docstring = inspect.getdoc(self._done)
-        self.done.__doc__ = _update_docstring
 
     def _update(self):
         self._step_counter += 1
@@ -65,3 +58,7 @@ class BaseTask(ABC):
     def _done(self, *args, **kwargs) -> bool:
         """custom definition of done by task"""
         raise NotImplementedError
+
+    @property
+    def step_counter(self) -> int:
+        return self._step_counter
