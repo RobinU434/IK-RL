@@ -12,6 +12,7 @@ numpy = "^1.26.4"
 torch = "^2.2.1"
 gymnasium = "^0.29.1"
 matplotlib = "^3.8.3"
+stable-baselines3 = {extras = ["extra"], version = "^2.2.1"}
 
 
 [tool.poetry.group.dev.dependencies]
