@@ -8,7 +8,7 @@ from ik_rl.robots.robot_arm import RobotArm
 class ImitationTask(BaseTask):
     def __init__(
         self,
-        n_joints: int,
+        robot_arm: RobotArm,
         n_time_steps: int = NUM_TIME_STEPS,
         order: float = 2,
         epsilon: float = 0.01,
@@ -16,7 +16,7 @@ class ImitationTask(BaseTask):
     ) -> None:
         super().__init__(epsilon, n_time_steps, **kwargs)
 
-        self._robot_arm = RobotArm(n_joints)
+        self._robot_arm = robot_arm
         self._target_pos = np.zeros(2)
         self._target_angles: ndarray
 
@@ -28,8 +28,8 @@ class ImitationTask(BaseTask):
         """_summary_
 
         Args:
-            target_position (ndarray): _description_
-            robot_arm_angles (ndarray): _description_
+            target_position (ndarray): position which the robot arm should reach by learning to imitate the solver
+            robot_arm_angles (ndarray): arm angles
 
         Returns:
             float: _description_
@@ -48,14 +48,12 @@ class ImitationTask(BaseTask):
         # new target position
         self._target_pos = target_position
         self._robot_arm.reset()
-        # bump up target position
-        target_position = np.concatenate([target_position, np.zeros(1)])
         # apply inverse kinematics
+        self._robot_arm.backward(target_position)
 
-        self._robot_arm.inv_kin(target_position, error_min=self._epsilon)
-        self._target_angles = self._robot_arm.angles
+        self._target_angles = self._robot_arm.abs_angles
         # squash target angles because of the tanh function in PolicyNet.forward()
-        # is a contradiction with the real_action unsquash function in PolicyNet.forward function
+        # is a contradiction with the real_action unsqueeze function in PolicyNet.forward function
         # self.target_angles = (self.target_angles - np.pi) / np.pi
 
     @staticmethod
