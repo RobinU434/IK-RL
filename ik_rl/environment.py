@@ -1,20 +1,23 @@
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Literal, Tuple
 
 import numpy as np
 import torch
 from gymnasium import spaces
-from ik_rl.robots.robot_arm import RobotArm
+import gymnasium
+from ik_rl.robots.robot_arm import RobotArm, RobotArm2D, RobotArm3D
+from ik_rl.solver.ccd import CCD
 from ik_rl.task.base_task import BaseTask
 from ik_rl.utils.sample_target import sample_target
 from numpy import ndarray
 from PIL import Image, ImageDraw
 
 
-class PlaneRobotEnv(gym.Env):
+class PlaneRobotEnv(gymnasium.Env):
     def __init__(
         self,
         task: BaseTask,
+        n_dims: Literal[2, 3] = 2,
         n_joints: int = 1,
         segment_length: float = 1,
         discrete_mode: bool = False,
@@ -22,7 +25,9 @@ class PlaneRobotEnv(gym.Env):
         **kwargs,
     ) -> None:
         self._task = task
-        self._robot_arm: RobotArm = RobotArm(n_joints, segment_length)
+        self._robot_arm: RobotArm = self._setup_robot_arm(
+            n_dims=n_dims, n_joints=n_joints, segment_length=segment_length
+        )
         # init angles and other
         self.reset()
 
@@ -43,6 +48,21 @@ class PlaneRobotEnv(gym.Env):
         self._set_observation_space()
 
         self._step_counter = 0
+
+    @staticmethod
+    def _setup_robot_arm(n_dims: int, n_joints: int, segment_length: float) -> RobotArm:
+        cls: RobotArm
+        match n_dims:
+            case 2:
+                cls = RobotArm2D
+            case 3:
+                cls = RobotArm3D
+            case _:
+                raise NotImplementedError(
+                    f"A robot arm for the requested dimension {n_dims} is not implemnted"
+                )
+        links = segment_length * np.ones(n_joints)
+        return cls(links=links, solver_cls=CCD)
 
     def _set_action_space(self) -> None:
         """
@@ -83,9 +103,9 @@ class PlaneRobotEnv(gym.Env):
         # with discrete actions the action is -1 +1 or 0 which will be added on top of the current angle
         # with continuous actions the action itself is the delta angle which will be also added on top of the current angle
         action = np.squeeze(action)
-        action = self._robot_arm.angles * self._strategic_mode + action  # type: ignore
+        action = self._robot_arm.abs_angles * self._strategic_mode + action  # type: ignore
 
-        self._robot_arm.set(action)
+        self._robot_arm.set_rel_angles(action)
 
     def _observe(self, normalize: bool = False) -> ndarray:
         if normalize:
@@ -97,7 +117,7 @@ class PlaneRobotEnv(gym.Env):
             arm_end_position = self._robot_arm.end_position
 
         obs = np.concatenate(
-            (target_position, arm_end_position, self._robot_arm.angles)
+            (target_position, arm_end_position, self._robot_arm.abs_angles)
         )
 
         return obs
@@ -143,7 +163,7 @@ class PlaneRobotEnv(gym.Env):
         kwargs = {
             "arm_position": self._robot_arm.end_position,
             "target_position": self._target_position,
-            "robot_arm_angles": self._robot_arm.angles,
+            "robot_arm_angles": self._robot_arm.abs_angles,
         }
         reward = self._task.reward(**kwargs)
 
