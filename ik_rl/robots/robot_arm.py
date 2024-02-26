@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 import numpy as np
 from numpy import ndarray
 from ik_rl.solver.base_solver import IKSolver
@@ -69,15 +69,11 @@ class RobotArm(ABC):
                 "Inverse kinematics is not possible because there is no solver."
             )
             return
-        dim = self._positions.shape[1]
 
         # for the angles you have to pass in the relative angles between the joints.
         # To get the absolute angels you can use the cum sum function
         # To invert this you can use:
         # >>> z[1:] -= z[:-1].copy()
-        # add z dimension in target because the solver is build for 3D space
-        # target_embedding = np.zeros(3)
-        # target_embedding[:2] = target
 
         res_angles = self._solver.solve(target=target)
         error = self._solver.dist_error
@@ -86,7 +82,7 @@ class RobotArm(ABC):
         # convert relative resulting angles (re_angles) into absolute angles
         # abs_angles = np.deg2rad(np.array(res_angles).cumsum())
         self.set_rel_angles(res_angles)
-        
+
         return error, solved
 
     def set_rel_angles(self, angles: ndarray) -> None:
@@ -95,7 +91,7 @@ class RobotArm(ABC):
         Args:
             angles (np.array): array with same length as number of joints
         """
-        self._rel_angles = angles  % (2 * np.pi)
+        self._rel_angles = angles % (2 * np.pi)
         self._positions, _ = self.forward(angles)
 
     def set_abs_angles(self, angles: ndarray) -> None:
@@ -130,7 +126,7 @@ class RobotArm(ABC):
     @property
     def rel_angles(self) -> ndarray:
         return self._rel_angles.copy()
-    
+
     @property
     def n_joints(self) -> int:
         return self._num_joints
@@ -167,7 +163,7 @@ class RobotArm2D(RobotArm):
         [[math.cos(theta), -math.sin(theta), 0], \\
          [math.sin(theta), math.cos(theta), 0], \\
          [0, 0, 1]]
-         
+
         Args:
             thetas (float): angles to rotate around z in radians. Shape (num_angles)
 
@@ -246,7 +242,7 @@ class RobotArm3D(RobotArm):
         second_row = np.stack([sin, cos])
 
         rot_mat = np.stack([first_row, second_row])
-        #rot_mat = np.moveaxis(rot_mat, -1, 0)   
+        # rot_mat = np.moveaxis(rot_mat, -1, 0)
 
         zeros = np.zeros((num_thetas, 2, 2))
         identity = np.eye(2)[None].repeat(num_thetas, axis=0)
