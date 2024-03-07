@@ -1,136 +1,73 @@
+SEGMENT_LENGTH = 1
+
 import logging
-from typing import Any, Dict, Literal, Tuple
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Any, Dict, Literal, SupportsFloat, Tuple
 
 import numpy as np
 import torch
-from gymnasium import spaces
-import gymnasium
+from gymnasium import Env, spaces
+from gymnasium.spaces import Box
+from matplotlib import pyplot as plt
+from numpy import ndarray
+
+from ik_rl.plot.plot import plot_arm, plot_base, plot_end_effector, plot_target
 from ik_rl.robots.robot_arm import RobotArm, RobotArm2D, RobotArm3D
 from ik_rl.solver.ccd import CCD
 from ik_rl.task.base_task import BaseTask
+from ik_rl.utils.cast import tensor_to_ndarray
 from ik_rl.utils.sample_target import sample_target
-from numpy import ndarray
-from PIL import Image, ImageDraw
 
 
-class PlaneRobotEnv(gymnasium.Env):
+class Mode(Enum):
+    STRATEGIC = 0
+    ONE_SHOT = 1
+
+
+class InvKinEnv(Env, ABC):
     def __init__(
         self,
         task: BaseTask,
         n_dims: Literal[2, 3] = 2,
-        n_joints: int = 1,
-        segment_length: float = 1,
-        discrete_mode: bool = False,
-        action_mode: str = "strategic",
-        **kwargs,
+        robot_config: Dict[str, Any] = {"n_joints": 1},
+        relative_angles: bool = False,
+        one_shot: bool = False,
     ) -> None:
+        super().__init__()
         self._task = task
-        self._robot_arm: RobotArm = self._setup_robot_arm(
-            n_dims=n_dims, n_joints=n_joints, segment_length=segment_length
-        )
-        # init angles and other
-        self.reset()
-
-        # discrete mode = True is for discrete actions (+-1 / +-0 degrees)
-        # discrete mode = False is for continuous actions
-        self._discrete_mode = discrete_mode
-
-        if action_mode == "strategic":
-            self._strategic_mode = True
-        elif action_mode == "one_shot":
-            self._strategic_mode = False
-        else:
-            logging.error("action mode has to be either 'strategic' or 'one_shot'")
-
-        self._target_position = self._get_target_position(self._robot_arm.arm_length)
-
-        self._set_action_space()
-        self._set_observation_space()
-
+        self._n_dims = n_dims
+        self._one_shot = one_shot
+        self._robot_arm = self._build_robot(n_dims=n_dims, robot_config=robot_config)
         self._step_counter = 0
+        self._relative_angles = relative_angles
+        self._target_position = sample_target(self._robot_arm.arm_length)
 
-    @staticmethod
-    def _setup_robot_arm(n_dims: int, n_joints: int, segment_length: float) -> RobotArm:
-        cls: RobotArm
-        match n_dims:
-            case 2:
-                cls = RobotArm2D
-            case 3:
-                cls = RobotArm3D
-            case _:
-                raise NotImplementedError(
-                    f"A robot arm for the requested dimension {n_dims} is not implemnted"
-                )
-        links = segment_length * np.ones(n_joints)
-        return cls(links=links, solver_cls=CCD)
+        self.action_space = self._build_action_space()
+        self.observation_space = self._build_observation_space()
 
-    def _set_action_space(self) -> None:
-        """
-        an action is either +1 degree, -1 degree or 0 degrees of rotation per joint
-        Therefor is one action a tensor with the length equal to the number of joints.
-        """
-        if self._discrete_mode:
-            self.action_space = spaces.Box(-1, 1, (1, self._robot_arm.n_joints))
-        else:
-            self.action_space = spaces.Box(0, 2 * np.pi, (1, self._robot_arm.n_joints))
-
-    def _set_observation_space(self) -> None:
-        """
-        observation space is a 4 dimensional tensor.
-            - first two dimensions: the 2D position of the goal position
-            - second two dimensions: the 2D position of the robot arm tip
-        """
-        self.observation_space = spaces.Box(
-            -self._robot_arm.arm_length,
-            self._robot_arm.arm_length,
-            (2 + 2 + self._robot_arm.n_joints, 1),
-        )
-
-    @staticmethod
-    def _get_target_position(radius: float):
-        return sample_target(radius)
-
-    def _apply_action(self, action: ndarray):
-        """adds action to the robot arm angles
+    def reset(
+        self, *, seed: int | None = None, target_position: ndarray | None = None
+    ) -> Tuple[Any | dict[str, Any]]:
+        """reset the environment.
+        Set the step counter to 0
+        Set the arm in the initial position
+        If there is a determined target_position. Set  the argument as the given target environment.
 
         Args:
-            action (ndarray): continuous action shape: ()
-        """
-        if isinstance(action, torch.Tensor):
-            # detach if the action tensor requires grad = True
-            action = action.detach().numpy()
-
-        # with discrete actions the action is -1 +1 or 0 which will be added on top of the current angle
-        # with continuous actions the action itself is the delta angle which will be also added on top of the current angle
-        action = np.squeeze(action)
-        action = self._robot_arm.abs_angles * self._strategic_mode + action  # type: ignore
-
-        self._robot_arm.set_rel_angles(action)
-
-    def _observe(self, normalize: bool = False) -> ndarray:
-        if normalize:
-            # normalize observations
-            target_position = self._target_position / self._robot_arm.arm_length
-            arm_end_position = self._robot_arm.end_position / self._robot_arm.arm_length
-        else:
-            target_position = self._target_position
-            arm_end_position = self._robot_arm.end_position
-
-        obs = np.concatenate(
-            (target_position, arm_end_position, self._robot_arm.abs_angles)
-        )
-
-        return obs
-
-    def reset(self, target_position: ndarray = None) -> ndarray:  # type: ignore
-        """resets the environment
-
-        Args:
-            target_position (ndarray): optional arguemt
+            seed (int | None, optional): seed (optional int): The seed that is used to initialize the environment's PRNG (`np_random`).
+                If the environment does not already have a PRNG and ``seed=None`` (the default option) is passed,
+                a seed will be chosen from some source of entropy (e.g. timestamp or /dev/urandom).
+                However, if the environment already has a PRNG and ``seed=None`` is passed, the PRNG will *not* be reset.
+                If you pass an integer, the PRNG will be reset even if it already exists.
+                Usually, you want to pass an integer *right after the environment has been initialized and then never again*.
+                Please refer to the minimal example above to see this paradigm in action. Defaults to None.
+            target_position (ndarray | None, optional): Special target to set. Defaults to None.
 
         Returns:
-            ndarray: _description_
+            Tuple[ndarray | dict[str, Any]]: observation containing target position, end effector position, and angles of the arm. Second return type is additional information as a dictionary.
         """
+        super().reset(seed=seed, options={})
         self._robot_arm.reset()
         self._task.reset()
 
@@ -139,24 +76,17 @@ class PlaneRobotEnv(gymnasium.Env):
         if target_position is None or len(target_position) != 2:
             msg = f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
             logging.info(msg)
-            self._target_position = self._get_target_position(
-                self._robot_arm.arm_length
-            )
+            self._target_position = sample_target(self._robot_arm.arm_length)
         else:
             self._target_position = target_position
 
-        return self._observe()
+        return self._observe(), {}
 
-    def step(self, action: ndarray) -> Tuple[ndarray, float, bool, Dict[str, Any]]:
-        """_summary_
-
-        Args:
-            action (np.array):
-
-        Returns:
-            Tuple[np.array, float, bool, Dict[str, Any]]: _description_
-        """
+    def step(
+        self, action: ndarray
+    ) -> Tuple[ndarray | SupportsFloat | bool | bool | dict[str, Any]]:
         self._step_counter += 1
+        assert self.action_space.contains(action)
         self._apply_action(action)
 
         # calculate reward
@@ -171,111 +101,213 @@ class PlaneRobotEnv(gymnasium.Env):
         obs = self._observe()
 
         # determine if the env is done
-        done = self._task.done(
+        truncated, done = self._task.done(
             arm_position=self._robot_arm.end_position,
             target_position=self._target_position,
         )
 
-        return obs, reward, done, {}
+        return obs, reward, done, truncated, {}
 
-    def render(self, path: str = "test.png"):
-        render_size = (
-            int(self._robot_arm.arm_length * 1.1),
-            int(self._robot_arm.arm_length * 1.1),
-        )
-        # origin is in the upper left corner
-        img = Image.new("RGB", render_size, (256, 256, 256))
-        draw = ImageDraw.Draw(img)
+    def render(self) -> ndarray:
+        if self._n_dims == 2:
+            fig, ax = plt.subplots()
+            ax = plot_base(ax, arm_reach=self._robot_arm.arm_length)
+            ax = plot_arm(ax, self._robot_arm)
+            ax = plot_target(ax, target_pos=self._target_position)
+            ax = plot_end_effector(ax, position=self._robot_arm.end_position)
+        elif self._n_dims == 3:
+            raise NotImplementedError
+        else:
+            raise ValueError(
+                "plotting methods for arms in higher dimensional space than 3 are not possible"
+            )
+        fig.show()
 
-        # set origin to the center
-        origin = (render_size[0] / 2, render_size[1] / 2)
-        scale_factor = 20
+    def close(self):
+        """After the user has finished using the environment, close contains the code necessary to "clean up" the environment.
 
-        self._draw_goal(draw, origin + self._target_position * scale_factor)
-        self._draw_segments(draw, origin, scale_factor)
-        self._draw_joints(draw, origin, scale_factor)
-
-        img.save(path)
-
-    def _draw_goal(self, draw, origin: ndarray = np.zeros((2)), radius=4):
-        x, y = origin
-        # distances to origin
-        # (left, upper, right, lower)
-        draw.ellipse(
-            (x - radius, y - radius, x + radius, y + radius),
-            fill=(255, 0, 0),
-            outline=(0, 0, 0),
-        )
-
-    def _draw_joints(self, draw, origin, scale_factor: float = 20):
-        for position in self._robot_arm._positions[:-1].copy():
-            # scale
-            position *= scale_factor
-
-            # move the segment
-            position = position + origin
-
-            self._draw_joint(draw, position)
-
-    def _draw_segments(self, draw, origin, scale_factor: float = 20):
-        for idx in range(self._robot_arm.n_joints):
-            start = self._robot_arm._positions[idx].copy()
-            end = self._robot_arm._positions[idx + 1].copy()
-
-            # scale
-            start *= scale_factor
-            end *= scale_factor
-
-            # move the segment
-            start += origin
-            end += origin
-
-            self.draw_segment(draw, start, end)
+        This is critical for closing rendering windows, database or HTTP connections.
+        Calling ``close`` on an already closed environment has no effect and won't raise an error.
+        """
+        logging.info("Close environment.")
 
     @staticmethod
-    def _draw_joint(draw, origin: Tuple[float, float] = (0, 0), radius=4):
-        """draws joint from robot arm as a grey circle
+    def _build_robot(n_dims: int, robot_config: Dict[str, Any]) -> RobotArm:
+        """build a robot arm based on the given arguments
 
         Args:
-            draw (_type_): _description_
-            origin (tuple, optional): origin of joint. (x, y) Defaults to (0, 0).
-            radius (int, optional): radius of joint. Defaults to 5.
+            n_dims (int): in which space the robot arm should operate
+            robot_config (Dict): arguments for the robot arm
+
+        Raises:
+            NotImplementedError: if n_dims > 3 or < 2
+
+        Returns:
+            RobotArm: build robot arm
         """
-        x, y = origin
-        # distances to origin
-        # (left, upper, right, lower)
-        draw.ellipse(
-            (x - radius, y - radius, x + radius, y + radius),
-            fill=(100, 100, 100),
-            outline=(0, 0, 0),
+        cls: RobotArm
+        match n_dims:
+            case 2:
+                cls = RobotArm2D
+            case 3:
+                raise NotImplementedError("3D robot arm is still in development")
+                cls = RobotArm3D
+            case _:
+                raise NotImplementedError(
+                    f"A robot arm for the requested dimension {n_dims} is not implemnted"
+                )
+        links = SEGMENT_LENGTH * np.ones(robot_config["n_joints"])
+        return cls(links=links, solver_cls=CCD)
+
+    @abstractmethod
+    def _build_action_space(self):
+        raise NotImplementedError
+
+    def _build_observation_space(self) -> Box:
+        """
+        observation space is a 4 dimensional tensor.
+            - first two dimensions: the 2D position of the goal position
+            - second two dimensions: the 2D position of the robot arm tip
+        """
+        return Box(
+            -self._robot_arm.arm_length,
+            self._robot_arm.arm_length,
+            (2 + 2 + self._robot_arm.n_joints, 1),
         )
 
-    @staticmethod
-    def draw_segment(
-        draw,
-        start: Tuple[float, float] = (0, 0),
-        end: Tuple[float, float] = (1, 1),
-        width: float = 3,
-    ):
-        """draw segment as yellow line
+    @abstractmethod
+    def _transform_action(self, action: ndarray) -> ndarray:
+        raise NotImplementedError
+
+    def _apply_action(self, action: ndarray | torch.Tensor):
+        """adds action to the robot arm angles
 
         Args:
-            draw (_type_): draw object to draw in
-            start (Tuple[float, float], optional): start position from line: (x, y). Defaults to (0, 0).
-            end (Tuple[float, float], optional): end position from line: (x, y). Defaults to (1, 1).
-            width (float, optional): width from line. Defaults to 2.
+            action (ndarray): continuous action shape: ()
         """
-        coord = [start[0], start[1], end[0], end[1]]
-        draw.line(coord, fill=(255, 255, 0), width=width)
+        action = self._transform_action(action)
+        action = self._robot_arm.rel_angles * (1 - self._one_shot) + action  # type: ignore
 
-    @property
-    def num_steps(self):
-        return self._step_counter
+        if self._relative_angles:
+            self._robot_arm.set_rel_angles(action)
+        else:  # alternative are absolute angles
+            self._robot_arm.set_abs_angles(action)
 
-    @property
-    def target_position(self):
-        return self._target_position
+    def _observe(self, normalize: bool = False) -> ndarray:
+        """build an observation of the environment to the current time step.
+        This observation contains [target_position, end_effector_position, robot_arm_angles]
+        TODO: relative or absolute angles
 
-    @property
-    def n_joints(self):
-        return self._robot_arm.n_joints
+        Args:
+            normalize (bool, optional): Would you like to normalize the positions. So set the maximal radius to 1. Defaults to False.
+
+        Returns:
+            ndarray: array with num_joints + 2 * space_dimension. space_dimension = 2 or 3 dimensional
+        """
+        if normalize:
+            # normalize observations
+            target_position = self._target_position / self._robot_arm.arm_length
+            arm_end_position = self._robot_arm.end_position / self._robot_arm.arm_length
+        else:
+            target_position = self._target_position
+            arm_end_position = self._robot_arm.end_position
+
+        obs = np.concatenate(
+            (target_position, arm_end_position, self._robot_arm.abs_angles)
+        )[:, None]
+
+        return obs
+
+
+class InvKinDiscrete(InvKinEnv):
+    """Send discrete actions to the environment. You set the set of available actions while constructing the environment
+    """
+    def __init__(
+        self,
+        task: BaseTask,
+        n_dims: Literal[2, 3] = 2,
+        robot_config: Dict[str, Any] = {"n_joints": 1},
+        available_actions: np.ndarray = np.array([-1, 0, 1]),
+        relative_angles: bool = False,
+    ) -> None:
+        """init class
+
+        Args:
+            task (BaseTask): task to complete the in environment
+            n_dims (Literal[2, 3], optional): robot arm in 2D or 3D space. Defaults to 2.
+            robot_config (dict, optional): arguments for the robot. To look up which arguments are supported please refer to the robot class. Defaults to {"n_joints": 1}.
+            available_actions (np.ndarray, optional): set of available actions. Defaults to np.array([-1, 0, 1]).
+            relative_angles (bool, optional): Flag to determine if the actions will be seen as absolute actions against angle 0 or relative to the previous joint. Defaults to False.
+        """
+        self._available_actions = (
+            available_actions
+            if isinstance(available_actions, np.ndarray)
+            else np.array(available_actions)
+        )
+        assert (
+            len(self._available_actions.shape) == 1
+        )  # expect only one dimensional array
+        super().__init__(task, n_dims, robot_config, relative_angles, False)
+
+    def _build_action_space(self):
+        nvec = np.ones(self._robot_arm.n_joints) * len(self._available_actions)
+        return spaces.MultiDiscrete(nvec=nvec)
+
+    def _transform_action(self, action: ndarray) -> ndarray:
+        """expect the action as a 2D array. first dimension is the robot arm length and second dimension is the distribution over actions
+        Function takes the argmax over the second dimension and maps those indices to the available actions
+
+        Args:
+            action (ndarray): action array from neural network. Expected shape: num_joints. Each element identifies an action from the available actions.
+
+        Returns:
+            ndarray: one dimensional array with length == num_joints
+        """
+        action = tensor_to_ndarray(action)
+        action = self._available_actions[action]
+
+        # with continuous actions the action itself is the delta angle which will be also added on top of the current angle
+        action = np.squeeze(action)
+        return action
+
+
+class InvKinEnvContinous(InvKinEnv):
+    """send continuous actions to the robot arm. 
+    """
+    def __init__(
+        self,
+        task: BaseTask,
+        n_dims: Literal[2, 3] = 2,
+        robot_config: Dict[str, Any] = {"n_joints": 1},
+        one_shot: bool = False,
+        relative_angles: bool = False,
+    ) -> None:
+        """init class
+
+        Args:
+            task (BaseTask): task to complete the in environment
+            n_dims (Literal[2, 3], optional): robot arm in 2D or 3D space. Defaults to 2.
+            robot_config (dict, optional): arguments for the robot. To look up which arguments are supported please refer to the robot class. Defaults to {"n_joints": 1}.
+            one_shot (bool, optional): would you like to have a sequential decision making process or predict the solution in one go. Defaults to False.
+            relative_angles (bool, optional): Flag to determine if the actions will be seen as absolute actions against angle 0 or relative to the previous joint. Defaults to False.
+        """
+        super().__init__(task, n_dims, robot_config, relative_angles, one_shot)
+        self._target_position = sample_target(self._robot_arm.arm_length)
+
+        self.action_space = self._build_action_space()
+        self.observation_space = self._build_observation_space()
+
+    def _build_action_space(self) -> Box:
+        """an action is either +1 degree, -1 degree or 0 degrees of rotation per joint
+        Therefor is one action a tensor with the length equal to the number of joints.
+
+
+        Returns:
+            Box: build action space on either a discrete action or continuous action space
+        """
+        return spaces.Box(0, 2 * np.pi, (1, self._robot_arm.n_joints))
+
+    def _transform_action(self, action: ndarray) -> ndarray:
+        action = tensor_to_ndarray(action)
+        action = np.squeeze(action)
+        return action
