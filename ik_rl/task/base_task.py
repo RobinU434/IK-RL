@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
 
 from ik_rl.task import NUM_TIME_STEPS
 
@@ -36,13 +37,13 @@ class BaseTask(ABC):
         """custom reward definition"""
         raise NotImplementedError
 
-    def done(self, *args, **kwargs) -> bool:
+    def done(self, *args, **kwargs) -> Tuple[bool | bool]:
         """definition of done. Either Episode exceeds time limit or
 
         Returns:
-            bool: if episode is done or not
+            tuple(bool, book): truncated -> exceeds time limits or other bounds, done -> if the agent has completed the task
         """
-        return self._exceeds_time_level() or self._done(*args, **kwargs)
+        return self._exceeds_time_level(), self._done(*args, **kwargs)
 
     def _exceeds_time_level(self) -> bool:
         """returns true if update was called more often than
