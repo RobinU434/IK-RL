@@ -21,6 +21,10 @@ flake8 = "^7.0.0"
 black = {extras = ["jupyter"], version = "^24.2.0"}
 coverage = "^7.4.2"
 
+
+[tool.poetry.group.example.dependencies]
+stable-baselines3 = {extras = ["extra"], version = "^2.2.1"}
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
