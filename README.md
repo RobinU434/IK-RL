@@ -1,7 +1,10 @@
-# Inverse Kinematic Reinforcement Learning Environment
-This repository implements a 2D or 3D robotic arm environment for reinforcement learning. The goal is to control the arm to reach a target position in the environment.
+# Inverse Kinematic Reinforcement Learning Environment with Scalable Action Space
+
+This repository implements a 2D or 3D robotic arm environment for reinforcement learning, featuring a highly scalable action space. The goal is to control the arm to reach a target position in the environment.
 
 The agent receives an observation of the environment, which includes the target position, the current end effector position, and the current joint angles of the robot arm. The agent then takes an action to change the joint angles, and receives a reward based on the distance between the end effector and the target position.
+
+This environment is designed to be adaptable to various scenarios by offering a scalable action space. Whether you're dealing with a simple 2-joint arm or a complex multi-jointed manipulator, this environment can accommodate your needs.
 
 ## Installation
 
