@@ -1,5 +1,3 @@
-SEGMENT_LENGTH = 1
-
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -156,7 +154,8 @@ class InvKinEnv(Env, ABC):
                 raise NotImplementedError(
                     f"A robot arm for the requested dimension {n_dims} is not implemnted"
                 )
-        links = SEGMENT_LENGTH * np.ones(robot_config["n_joints"])
+        # if you want to have other segment length please replace the 1 with any other value or a RNG
+        links = 1 * np.ones(robot_config["n_joints"])
         return cls(links=links, solver_cls=CCD)
 
     @abstractmethod
@@ -220,8 +219,8 @@ class InvKinEnv(Env, ABC):
 
 
 class InvKinDiscrete(InvKinEnv):
-    """Send discrete actions to the environment. You set the set of available actions while constructing the environment
-    """
+    """Send discrete actions to the environment. You set the set of available actions while constructing the environment"""
+
     def __init__(
         self,
         task: BaseTask,
@@ -272,8 +271,8 @@ class InvKinDiscrete(InvKinEnv):
 
 
 class InvKinEnvContinous(InvKinEnv):
-    """send continuous actions to the robot arm. 
-    """
+    """send continuous actions to the robot arm."""
+
     def __init__(
         self,
         task: BaseTask,

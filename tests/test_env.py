@@ -6,11 +6,11 @@ def test_init():
     segment_length = 1
     n_joints = 2
     task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinEnvContinous(task=task, robot_config={"n_joints": n_joints})
+    InvKinEnvContinous(task=task, robot_config={"n_joints": n_joints})
 
     n_joints = 2
     task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinDiscrete(task=task, robot_config={"n_joints": n_joints})
+    InvKinDiscrete(task=task, robot_config={"n_joints": n_joints})
 
 
 def test_reset():

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import Tuple
 
 import numpy as np
 from numpy import ndarray
@@ -31,6 +31,7 @@ class CircleGenerator(ObstacleGenerator):
 
     def get_obstacles(self) -> ndarray:
         num_obstacles = self._get_number_obstacles()
+        print(num_obstacles)
 
 
 class PolygonGenerator(ObstacleGenerator):
@@ -40,3 +41,4 @@ class PolygonGenerator(ObstacleGenerator):
 
     def get_obstacles(self) -> ndarray:
         num_obstacles = self._get_number_obstacles()
+        print(num_obstacles)
