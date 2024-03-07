@@ -1,24 +1,29 @@
-"""from typing import Callable, Tuple
-from matplotlib.figure import Figure
 from matplotlib.axes import Axes
-import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from numpy import ndarray
+
+from ik_rl.robots.robot_arm import RobotArm
 
 
-def env_plot(
-    plot_func: Callable,
-    fig: Figure = None,
-    ax: Axes = None,
-    *kwargs,
-) -> Tuple[Figure, Axes]:
+def plot_base(ax: Axes, arm_reach: float) -> Axes:
+    circle = Circle((0, 0), radius=arm_reach, color="grey", alpha=0.2)
+    ax.add_patch(p=circle)
+    ax.set_xlim(-arm_reach * 1.05, arm_reach * 1.05)
+    ax.set_ylim(-arm_reach * 1.05, arm_reach * 1.05)
 
-    def wrapper():
-        if fig is None:
-            fig, ax = plt.subplots()
-        ax = plot_func(ax, *kwargs)
-
-    return wrapper
+    return ax
 
 
-def plot_base(ax: Axes):
-    pass
-"""
+def plot_target(ax: Axes, target_pos: ndarray) -> Axes:
+    ax.scatter(*target_pos, c="r", s=15)
+    return ax
+
+
+def plot_arm(ax: Axes, robot: RobotArm) -> Axes:
+    ax.plot(*robot.positions.T, ".-", color="orange")
+    return ax
+
+
+def plot_end_effector(ax, position: ndarray) -> Axes:
+    ax.scatter(*position, c="green", s=10, zorder=-1)
+    return ax
