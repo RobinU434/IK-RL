@@ -1,23 +1,25 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, Literal, Tuple, Type
 
 import numpy as np
 import torch
 from gymnasium import Env, spaces
+from gymnasium.error import DependencyNotInstalled
 from gymnasium.spaces import Box
-from matplotlib import pyplot as plt
-from numpy import ndarray
-
 from ik_rl.plot.plot import plot_arm, plot_base, plot_end_effector, plot_target
-from ik_rl.robots.robot_arm import _RobotArm, RobotArm2D, RobotArm3D
+from ik_rl.robots.robot_arm import RobotArm2D, RobotArm3D, _RobotArm
 from ik_rl.solver.ccd import CCD
 from ik_rl.task.base_task import _BaseTask
 from ik_rl.task.config import NUM_TIME_STEPS
 from ik_rl.task.imitation_task import ImitationTask
 from ik_rl.task.reach_goal_task import ReachGoalTask
 from ik_rl.utils.sample_target import sample_target
+from matplotlib import pyplot as plt
+from numpy import ndarray
+import pygame
+from pygame import gfxdraw  # noqa: F401
 
 
 class Mode(Enum):
@@ -25,7 +27,9 @@ class Mode(Enum):
     ONE_SHOT = 1
 
 
-class _InvKinEnv(Env, ABC):
+class _InvKinEnv(Env):
+    metadata: dict[str, Any] = {"render_modes": ["rgb_array", "human"], "render_fps": 2}
+
     def __init__(
         self,
         n_steps: int = NUM_TIME_STEPS,
@@ -36,8 +40,10 @@ class _InvKinEnv(Env, ABC):
         task: Type[_BaseTask] = ReachGoalTask,
         task_kwargs: Dict[str, Any] = None,
         epsilon: float = 1e-2,
-        relative_angles: bool = False,
+        relative_angles: bool = True,
         one_shot: bool = False,
+        render_mode: str = None,
+        render_size: int = 400,
     ) -> None:
         super().__init__()
         self._n_steps = n_steps
@@ -45,8 +51,10 @@ class _InvKinEnv(Env, ABC):
         self._n_dims = n_dims
         self._n_joints = n_joints
         self._segment_length = segment_length
-        self._one_shot = one_shot
         self._relative_angles = relative_angles
+        self._one_shot = one_shot
+        self.render_mode = render_mode
+        self._render_size = render_size
 
         self._robot_arm = self._build_robot(
             n_dims=self._n_dims,
@@ -62,10 +70,15 @@ class _InvKinEnv(Env, ABC):
 
         self._step_counter = 0
 
+        # render with pygame
+        self.screen = None
+        self.clock = None
+
     def reset(
         self,
         *,
         seed: int | None = None,
+        options: Dict[str, Any] | None = None,
         target_position: ndarray | None = None,
         rand_arm_angles: bool = False,
     ) -> Tuple[ndarray, dict[str, Any]]:
@@ -88,10 +101,9 @@ class _InvKinEnv(Env, ABC):
             Tuple[ndarray | dict[str, Any]]: observation containing target position, end effector position, and angles of the arm. Second return type is additional information as a dictionary.
         """
         super().reset(seed=seed, options={})
+        rel_angles = None
         if rand_arm_angles:
             rel_angles = np.random.rand(self._robot_arm.n_joints) * 2 * np.pi
-        else:
-            rel_angles = None
         self._robot_arm.reset(rel_angles)
         self._task.reset()
 
@@ -132,20 +144,54 @@ class _InvKinEnv(Env, ABC):
 
         return obs, reward, done, truncated, {}
 
-    def render(self) -> ndarray:
+    def _get_rgb_array(self) -> ndarray:
+        """return rendered image as np.ndarray
+
+        Returns:
+            ndarray: (height, width, 3)
+        """
         if self._n_dims == 2:
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(4, 4))
             ax = plot_base(ax, arm_reach=self._robot_arm.arm_length)
             ax = plot_arm(ax, self._robot_arm)
             ax = plot_target(ax, target_pos=self._target_position)
             ax = plot_end_effector(ax, position=self._robot_arm.end_position)
+            fig.canvas.draw()
+            data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+            data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))[..., :3]
+            return data
         elif self._n_dims == 3:
             raise NotImplementedError
         else:
             raise ValueError(
                 "plotting methods for arms in higher dimensional space than 3 are not possible"
             )
-        fig.show()
+
+    def _human_render(self):
+        if self.screen is None:
+            pygame.init()
+            pygame.display.init()
+            self.screen = pygame.display.set_mode(
+                (self._render_size, self._render_size)
+            )
+        if self.clock is None:
+            self.clock = pygame.time.Clock()
+        rgb_array = self._get_rgb_array()
+        rgb_array = np.swapaxes(rgb_array, axis1=0, axis2=1)
+        surface = pygame.surfarray.make_surface(rgb_array)
+        self.screen.blit(surface, (0, 0))
+        self.clock.tick(self.metadata["render_fps"])
+        pygame.display.flip()
+
+    def render(self) -> ndarray | None:
+        if self.render_mode is None:
+            return
+        elif self.render_mode == "rgb_array":
+            return self._get_rgb_array()
+        elif self.render_mode == "human":
+            self._human_render()
+        else:
+            raise NotImplementedError
 
     def close(self):
         """After the user has finished using the environment, close contains the code necessary to "clean up" the environment.
@@ -153,6 +199,14 @@ class _InvKinEnv(Env, ABC):
         This is critical for closing rendering windows, database or HTTP connections.
         Calling ``close`` on an already closed environment has no effect and won't raise an error.
         """
+        if self.screen is not None:
+            import pygame
+
+            pygame.display.quit()
+            pygame.quit()
+            self.isopen = False
+
+        return super().close()
         logging.info("Close environment.")
 
     @staticmethod
@@ -192,7 +246,6 @@ class _InvKinEnv(Env, ABC):
             links = links / n_joints
         else:
             links = links * segment_length
-
         if robot_kwargs is None:
             robot_kwargs = {}
         return cls(links=links, solver_cls=CCD, **robot_kwargs)
@@ -283,6 +336,7 @@ class InvKinDiscrete(_InvKinEnv):
         epsilon=0.01,
         relative_angles=False,
         one_shot=False,
+        render_mode=None,
         available_actions: np.ndarray = np.array([-1, 0, 1]),
     ):
         """init class
@@ -308,6 +362,7 @@ class InvKinDiscrete(_InvKinEnv):
             epsilon,
             relative_angles,
             one_shot,
+            render_mode,
         )
 
     def _build_action_space(self):
@@ -345,6 +400,7 @@ class InvKinEnvContinuous(_InvKinEnv):
         epsilon=0.01,
         relative_angles=False,
         one_shot=False,
+        render_mode=None,
     ):
         """init class
 
@@ -366,6 +422,7 @@ class InvKinEnvContinuous(_InvKinEnv):
             epsilon,
             relative_angles,
             one_shot,
+            render_mode,
         )
         self._target_position = sample_target(self._robot_arm.arm_length)
 
@@ -384,3 +441,5 @@ class InvKinEnvContinuous(_InvKinEnv):
 
     def _transform_action(self, action: ndarray) -> ndarray:
         return action
+
+    

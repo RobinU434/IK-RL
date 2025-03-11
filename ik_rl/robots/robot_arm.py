@@ -126,7 +126,7 @@ class _RobotArm(ABC):
 
     @property
     def abs_angles(self) -> ndarray:
-        abs_angles = np.cumsum(self._rel_angles)
+        abs_angles = np.cumsum(self._rel_angles) % (2 * np.pi)
         return abs_angles.copy()
 
     @property
