@@ -1,30 +1,32 @@
-[tool.poetry]
+[project]
 name = "ik-rl"
 version = "0.1.0"
-description = ""
-authors = ["Robin Uhrich <robin.uhrich@gmail.com>"]
-license = "MIT"
+description = "RL environment for solving inverse kinematics for a robot arm with n many joints in 2D"
+authors = [{ name = "Robin Uhrich", email = "robin.uhrich@gmail.com" }]
+urls = { github = "https://github.com/RobinU434/IK-RL" }
+license = { file = "LICENSE" }
+keywords = [
+    "reinforcement-learning",
+    "robotics",
+    "inverse-kinematics",
+    "scaleable",
+    "reinforcement-learning-environments",
+]
 readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy (>=2.2.3,<3.0.0)",
+    "gymnasium (>=1.1.1,<2.0.0)",
+    "matplotlib (>=3.10.1,<4.0.0)",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = "^1.26.4"
-torch = "^2.2.1"
-gymnasium = "^0.29.1"
-matplotlib = "^3.8.3"
-stable-baselines3 = {extras = ["extra"], version = "^2.2.1"}
-
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0.1"
-flake8 = "^7.0.0"
-black = {extras = ["jupyter"], version = "^24.2.0"}
-coverage = "^7.4.2"
-
-
-[tool.poetry.group.example.dependencies]
-stable-baselines3 = {extras = ["extra"], version = "^2.2.1"}
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+flake8 = "^7.1.2"
+black = "^25.1.0"
+coverage = "^7.6.12"
