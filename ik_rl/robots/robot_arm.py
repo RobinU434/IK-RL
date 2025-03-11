@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Type
 import numpy as np
 from numpy import ndarray
-from ik_rl.solver.base_solver import IKSolver
+from ik_rl.solver.base_solver import _IKSolver
 
 
-class RobotArm(ABC):
+class _RobotArm(ABC):
     def __init__(
-        self, links: ndarray, solver_cls: type = None, solver_args: Dict[str, Any] = {}
+        self, links: ndarray, solver_cls: Type[_IKSolver] = None, solver_args: Dict[str, Any] = {}
     ) -> None:
         super().__init__()
 
@@ -24,10 +24,13 @@ class RobotArm(ABC):
         if solver_cls is None:
             self._solver = None
         else:
-            self._solver: IKSolver = solver_cls(self, **solver_args)
+            self._solver: _IKSolver = solver_cls(self, **solver_args)
 
-    def reset(self):
-        self._rel_angles = np.zeros((self._num_joints))
+    def reset(self, rel_angles: np.ndarray = None):
+        if rel_angles is None:
+            self._rel_angles = np.zeros((self._num_joints))
+        else:
+            self._rel_angles = rel_angles
         self.set_rel_angles(self._rel_angles)
 
     def forward(self, angles: ndarray) -> Tuple[ndarray, ndarray]:
@@ -144,7 +147,7 @@ class RobotArm(ABC):
         return self._positions[-1]
 
 
-class RobotArm2D(RobotArm):
+class RobotArm2D(_RobotArm):
     """implementation of a robt arm in 2D space."""
 
     def __init__(
@@ -205,7 +208,7 @@ class RobotArm2D(RobotArm):
         return trans
 
 
-class RobotArm3D(RobotArm):
+class RobotArm3D(_RobotArm):
     def __init__(
         self, links: ndarray, solver_cls: type = None, solver_args: Dict[str, Any] = {}
     ) -> None:

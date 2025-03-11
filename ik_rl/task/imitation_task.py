@@ -1,16 +1,15 @@
 import numpy as np
 from numpy import ndarray
-from ik_rl.task import NUM_TIME_STEPS
-from ik_rl.task.base_task import BaseTask
-from ik_rl.robots.robot_arm import RobotArm
+from ik_rl.task.config import NUM_TIME_STEPS
+from ik_rl.task.base_task import _BaseTask
+from ik_rl.robots.robot_arm import _RobotArm
 
 
-class ImitationTask(BaseTask):
+class ImitationTask(_BaseTask):
     def __init__(
         self,
-        robot_arm: RobotArm,
+        robot_arm: _RobotArm,
         n_time_steps: int = NUM_TIME_STEPS,
-        order: float = 2,
         epsilon: float = 0.01,
         **kwargs
     ) -> None:
@@ -19,8 +18,6 @@ class ImitationTask(BaseTask):
         self._robot_arm = robot_arm
         self._target_pos = np.zeros(2)
         self._target_angles: ndarray
-
-        self._order = order
 
     def _reward(
         self, target_position: ndarray, robot_arm_angles: ndarray, **kwargs
@@ -38,9 +35,7 @@ class ImitationTask(BaseTask):
             self._update_target_angles(target_position)
 
         # MSE between target angles and current arm angles
-        loss = -np.power(
-            self.angle_diff(self._target_angles, robot_arm_angles), self._order
-        ).mean()
+        loss = -np.square(self.angle_diff(self._target_angles, robot_arm_angles)).mean()
 
         return loss
 

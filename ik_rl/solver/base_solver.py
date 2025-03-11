@@ -3,7 +3,7 @@ from numpy import ndarray
 import numpy as np
 
 
-class IKSolver(ABC):
+class _IKSolver(ABC):
     def __init__(self, num_joints: int) -> None:
         self._num_joints = num_joints
 
@@ -12,6 +12,18 @@ class IKSolver(ABC):
 
     @abstractmethod
     def solve(self, angles: ndarray, target: ndarray) -> ndarray:
+        """_summary_
+
+        Args:
+            angles (ndarray): _description_
+            target (ndarray): _description_
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            ndarray: _description_
+        """
         raise NotImplementedError
 
     @property

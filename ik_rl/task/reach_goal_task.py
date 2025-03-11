@@ -1,39 +1,29 @@
 import numpy as np
 from numpy import ndarray
-from ik_rl.task import NUM_TIME_STEPS
-from ik_rl.task.base_task import BaseTask
+from ik_rl.task.config import NUM_TIME_STEPS
+from ik_rl.task.base_task import _BaseTask
 
 
-class ReachGoalTask(BaseTask):
+class ReachGoalTask(_BaseTask):
     def __init__(
         self,
-        arm_reach: float,
         epsilon: float = 0.1,
         n_time_steps: int = NUM_TIME_STEPS,
         bonus: int = 0,
-        normalize: bool = True,
         **kwargs
     ) -> None:
-        super().__init__(epsilon, n_time_steps, **kwargs)
-        self._normalization_factor = self._get_normalize_factor(
-            arm_reach=arm_reach, normalize=normalize
-        )
-        self._bonus = bonus
-        """float: bonus if arm reached target position"""
-
-    def _get_normalize_factor(self, arm_reach: float, normalize: bool = True) -> float:
-        """to fit the mean distance value into the interval [0, 1]. Defaults to 1.0.
+        """_summary_
 
         Args:
-            arm_reach (float): How far a arm can reach.
+            arm_reach (float): how long is the robot arm
+            epsilon (float, optional): when to have reached the goal successfully. Defaults to 0.1.
+            n_time_steps (int, optional): . Defaults to NUM_TIME_STEPS.
+            bonus (int, optional): _description_. Defaults to 0.
             normalize (bool, optional): _description_. Defaults to True.
-
-        Returns:
-            float: 1 / (arm_reach * 2) if normalize == True otherwise 1.0
         """
-        if normalize:
-            return 1 / (arm_reach * 2)
-        return 1.0
+        super().__init__(epsilon, n_time_steps, **kwargs)
+        self._bonus = bonus
+        """float: bonus if arm reached target position"""
 
     def _reward(
         self, arm_position: ndarray, target_position: ndarray, **kwargs
@@ -49,10 +39,7 @@ class ReachGoalTask(BaseTask):
         """
         # add bonus if the arm has reached its desired target
         bonus = self._bonus * self._is_near_target(arm_position, target_position)
-        norm_target_distance = (
-            np.linalg.norm(arm_position - target_position).item()
-            * self._normalization_factor
-        )
+        norm_target_distance = np.linalg.norm(arm_position - target_position).item()
         reward = -norm_target_distance + bonus
 
         return reward

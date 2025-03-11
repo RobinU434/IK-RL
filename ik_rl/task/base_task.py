@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Tuple
 
-from ik_rl.task import NUM_TIME_STEPS
+from ik_rl.task.config import NUM_TIME_STEPS
 
 
-class BaseTask(ABC):
+class _BaseTask(ABC):
     """Base class for any Task you want ot submit to the plane robot environment"""
 
     def __init__(
@@ -37,7 +37,7 @@ class BaseTask(ABC):
         """custom reward definition"""
         raise NotImplementedError
 
-    def done(self, *args, **kwargs) -> Tuple[bool | bool]:
+    def is_done(self, *args, **kwargs) -> Tuple[bool, bool]:
         """definition of done. Either Episode exceeds time limit or
 
         Returns:

@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Dict, Literal, SupportsFloat, Tuple
+from typing import Any, Dict, Literal, Tuple, Type
 
 import numpy as np
 import torch
@@ -11,10 +11,12 @@ from matplotlib import pyplot as plt
 from numpy import ndarray
 
 from ik_rl.plot.plot import plot_arm, plot_base, plot_end_effector, plot_target
-from ik_rl.robots.robot_arm import RobotArm, RobotArm2D, RobotArm3D
+from ik_rl.robots.robot_arm import _RobotArm, RobotArm2D, RobotArm3D
 from ik_rl.solver.ccd import CCD
-from ik_rl.task.base_task import BaseTask
-from ik_rl.utils.cast import tensor_to_ndarray
+from ik_rl.task.base_task import _BaseTask
+from ik_rl.task.config import NUM_TIME_STEPS
+from ik_rl.task.imitation_task import ImitationTask
+from ik_rl.task.reach_goal_task import ReachGoalTask
 from ik_rl.utils.sample_target import sample_target
 
 
@@ -23,30 +25,46 @@ class Mode(Enum):
     ONE_SHOT = 1
 
 
-class InvKinEnv(Env, ABC):
+class _InvKinEnv(Env, ABC):
     def __init__(
         self,
-        task: BaseTask,
+        n_steps: int = NUM_TIME_STEPS,
         n_dims: Literal[2, 3] = 2,
-        robot_config: Dict[str, Any] = {"n_joints": 1},
+        n_joints: int = 1,
+        segment_length: int = None,
+        robot_kwargs: Dict[str, Any] = None,
+        task: Type[_BaseTask] = ReachGoalTask,
+        task_kwargs: Dict[str, Any] = None,
+        epsilon: float = 1e-2,
         relative_angles: bool = False,
         one_shot: bool = False,
     ) -> None:
         super().__init__()
-        self._task = task
+        self._n_steps = n_steps
+        self._epsilon = epsilon
         self._n_dims = n_dims
+        self._n_joints = n_joints
+        self._segment_length = segment_length
         self._one_shot = one_shot
-        self._robot_arm = self._build_robot(n_dims=n_dims, robot_config=robot_config)
-        self._step_counter = 0
         self._relative_angles = relative_angles
+
+        self._robot_arm = self._build_robot(
+            n_dims=self._n_dims,
+            n_joints=self._n_joints,
+            segment_length=self._segment_length,
+            robot_kwargs=robot_kwargs,
+        )
+        self._task = self._build_task(task, task_kwargs)
         self._target_position = sample_target(self._robot_arm.arm_length)
 
         self.action_space = self._build_action_space()
         self.observation_space = self._build_observation_space()
 
+        self._step_counter = 0
+
     def reset(
-        self, *, seed: int | None = None, target_position: ndarray | None = None
-    ) -> Tuple[Any | dict[str, Any]]:
+        self, *, seed: int | None = None, target_position: ndarray | None = None, rand_arm_angles: bool = False
+    ) -> Tuple[ndarray, dict[str, Any]]:
         """reset the environment.
         Set the step counter to 0
         Set the arm in the initial position
@@ -66,7 +84,11 @@ class InvKinEnv(Env, ABC):
             Tuple[ndarray | dict[str, Any]]: observation containing target position, end effector position, and angles of the arm. Second return type is additional information as a dictionary.
         """
         super().reset(seed=seed, options={})
-        self._robot_arm.reset()
+        if rand_arm_angles:
+            rel_angles = np.random.rand(self._robot_arm.n_joints) * 2 * np.pi
+        else:
+            rel_angles = None
+        self._robot_arm.reset(rel_angles)
         self._task.reset()
 
         self._step_counter = 0
@@ -82,7 +104,7 @@ class InvKinEnv(Env, ABC):
 
     def step(
         self, action: ndarray
-    ) -> Tuple[ndarray | SupportsFloat | bool | bool | dict[str, Any]]:
+    ) -> Tuple[ndarray, float, bool, bool, dict[str, Any]]:
         self._step_counter += 1
         assert self.action_space.contains(action)
         self._apply_action(action)
@@ -99,7 +121,7 @@ class InvKinEnv(Env, ABC):
         obs = self._observe()
 
         # determine if the env is done
-        truncated, done = self._task.done(
+        truncated, done = self._task.is_done(
             arm_position=self._robot_arm.end_position,
             target_position=self._target_position,
         )
@@ -130,7 +152,12 @@ class InvKinEnv(Env, ABC):
         logging.info("Close environment.")
 
     @staticmethod
-    def _build_robot(n_dims: int, robot_config: Dict[str, Any]) -> RobotArm:
+    def _build_robot(
+        n_dims: int,
+        n_joints: int = 1,
+        segment_length: float = None,
+        robot_kwargs: Dict[str, Any] = None,
+    ) -> _RobotArm:
         """build a robot arm based on the given arguments
 
         Args:
@@ -143,7 +170,7 @@ class InvKinEnv(Env, ABC):
         Returns:
             RobotArm: build robot arm
         """
-        cls: RobotArm
+        cls: _RobotArm
         match n_dims:
             case 2:
                 cls = RobotArm2D
@@ -155,8 +182,27 @@ class InvKinEnv(Env, ABC):
                     f"A robot arm for the requested dimension {n_dims} is not implemnted"
                 )
         # if you want to have other segment length please replace the 1 with any other value or a RNG
-        links = 1 * np.ones(robot_config["n_joints"])
-        return cls(links=links, solver_cls=CCD)
+
+        links = np.ones(n_joints)
+        if segment_length is None:
+            links = links / n_joints
+        else:
+            links = links * segment_length
+
+        if robot_kwargs is None:
+            robot_kwargs = {}
+        return cls(links=links, solver_cls=CCD, **robot_kwargs)
+
+    def _build_task(
+        self, task_type: Type[_BaseTask], task_kwargs: Dict[str, Any] = None
+    ) -> _BaseTask:
+        args = {"epsilon": self._epsilon, "n_time_steps": self._n_steps}
+        if task_kwargs is not None:
+            args = {**args, **task_kwargs}
+
+        if task_type == ImitationTask:
+            args = {**args, "robot_arm": self._robot_arm}
+        return task_type(**args)
 
     @abstractmethod
     def _build_action_space(self):
@@ -218,17 +264,23 @@ class InvKinEnv(Env, ABC):
         return obs
 
 
-class InvKinDiscrete(InvKinEnv):
+class InvKinDiscrete(_InvKinEnv):
     """Send discrete actions to the environment. You set the set of available actions while constructing the environment"""
 
     def __init__(
         self,
-        task: BaseTask,
-        n_dims: Literal[2, 3] = 2,
-        robot_config: Dict[str, Any] = {"n_joints": 1},
+        n_steps=NUM_TIME_STEPS,
+        n_dims=2,
+        n_joints=1,
+        segment_length=None,
+        robot_kwargs=None,
+        task=ReachGoalTask,
+        task_kwargs=None,
+        epsilon=0.01,
+        relative_angles=False,
+        one_shot=False,
         available_actions: np.ndarray = np.array([-1, 0, 1]),
-        relative_angles: bool = False,
-    ) -> None:
+    ):
         """init class
 
         Args:
@@ -238,19 +290,27 @@ class InvKinDiscrete(InvKinEnv):
             available_actions (np.ndarray, optional): set of available actions. Defaults to np.array([-1, 0, 1]).
             relative_angles (bool, optional): Flag to determine if the actions will be seen as absolute actions against angle 0 or relative to the previous joint. Defaults to False.
         """
-        self._available_actions = (
-            available_actions
-            if isinstance(available_actions, np.ndarray)
-            else np.array(available_actions)
-        )
         assert (
-            len(self._available_actions.shape) == 1
+            len(available_actions.shape) == 1
         )  # expect only one dimensional array
-        super().__init__(task, n_dims, robot_config, relative_angles, False)
+        self._available_actions = available_actions[None].repeat(n_joints, axis=0)
+        
+        super().__init__(
+            n_steps,
+            n_dims,
+            n_joints,
+            segment_length,
+            robot_kwargs,
+            task,
+            task_kwargs,
+            epsilon,
+            relative_angles,
+            one_shot,
+        )
 
     def _build_action_space(self):
-        nvec = np.ones(self._robot_arm.n_joints) * len(self._available_actions)
-        return spaces.MultiDiscrete(nvec=nvec)
+        n_vec = np.ones(self._robot_arm.n_joints) * self._available_actions.shape[1]
+        return spaces.MultiDiscrete(nvec=n_vec)
 
     def _transform_action(self, action: ndarray) -> ndarray:
         """expect the action as a 2D array. first dimension is the robot arm length and second dimension is the distribution over actions
@@ -262,25 +322,28 @@ class InvKinDiscrete(InvKinEnv):
         Returns:
             ndarray: one dimensional array with length == num_joints
         """
-        action = tensor_to_ndarray(action)
-        action = self._available_actions[action]
-
+        action = self._available_actions[np.arange(self._n_joints), action]
         # with continuous actions the action itself is the delta angle which will be also added on top of the current angle
         action = np.squeeze(action)
         return action
 
 
-class InvKinEnvContinous(InvKinEnv):
+class InvKinEnvContinuous(_InvKinEnv):
     """send continuous actions to the robot arm."""
 
     def __init__(
         self,
-        task: BaseTask,
-        n_dims: Literal[2, 3] = 2,
-        robot_config: Dict[str, Any] = {"n_joints": 1},
-        one_shot: bool = False,
-        relative_angles: bool = False,
-    ) -> None:
+        n_steps=NUM_TIME_STEPS,
+        n_dims=2,
+        n_joints=1,
+        segment_length=None,
+        robot_kwargs=None,
+        task=ReachGoalTask,
+        task_kwargs=None,
+        epsilon=0.01,
+        relative_angles=False,
+        one_shot=False,
+    ):
         """init class
 
         Args:
@@ -290,7 +353,18 @@ class InvKinEnvContinous(InvKinEnv):
             one_shot (bool, optional): would you like to have a sequential decision making process or predict the solution in one go. Defaults to False.
             relative_angles (bool, optional): Flag to determine if the actions will be seen as absolute actions against angle 0 or relative to the previous joint. Defaults to False.
         """
-        super().__init__(task, n_dims, robot_config, relative_angles, one_shot)
+        super().__init__(
+            n_steps,
+            n_dims,
+            n_joints,
+            segment_length,
+            robot_kwargs,
+            task,
+            task_kwargs,
+            epsilon,
+            relative_angles,
+            one_shot,
+        )
         self._target_position = sample_target(self._robot_arm.arm_length)
 
         self.action_space = self._build_action_space()
@@ -304,9 +378,8 @@ class InvKinEnvContinous(InvKinEnv):
         Returns:
             Box: build action space on either a discrete action or continuous action space
         """
-        return spaces.Box(0, 2 * np.pi, (1, self._robot_arm.n_joints))
+        return spaces.Box(0, 2 * np.pi, shape=(self._robot_arm.n_joints,))
 
     def _transform_action(self, action: ndarray) -> ndarray:
-        action = tensor_to_ndarray(action)
-        action = np.squeeze(action)
         return action
+

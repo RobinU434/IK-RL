@@ -2,7 +2,7 @@ from matplotlib.axes import Axes
 from matplotlib.patches import Circle
 from numpy import ndarray
 
-from ik_rl.robots.robot_arm import RobotArm
+from ik_rl.robots.robot_arm import _RobotArm
 
 
 def plot_base(ax: Axes, arm_reach: float) -> Axes:
@@ -19,7 +19,7 @@ def plot_target(ax: Axes, target_pos: ndarray) -> Axes:
     return ax
 
 
-def plot_arm(ax: Axes, robot: RobotArm) -> Axes:
+def plot_arm(ax: Axes, robot: _RobotArm) -> Axes:
     ax.plot(*robot.positions.T, ".-", color="orange")
     return ax
 

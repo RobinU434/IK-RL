@@ -4,16 +4,16 @@
 # =========================================================================================================
 import numpy as np
 from numpy import ndarray
-from ik_rl.robots.robot_arm import RobotArm
+from ik_rl.robots.robot_arm import _RobotArm
 
-from ik_rl.solver.base_solver import IKSolver
+from ik_rl.solver.base_solver import _IKSolver
 from ik_rl.utils.geometry import angle_between_2D, angle_between_3D
 from itertools import product
 
 
-class CCD(IKSolver):
+class CCD(_IKSolver):
     def __init__(
-        self, robot: RobotArm, max_iter: int = 10000, err_min: float = 0.1
+        self, robot: _RobotArm, max_iter: int = 10000, err_min: float = 0.1, epsilon: float = 1e-10
     ) -> None:
         super().__init__(num_joints=robot.n_joints)
         self._robot = robot
@@ -24,7 +24,7 @@ class CCD(IKSolver):
         self._links = np.ones(self._robot.n_joints) * self._robot._links
 
         # value to zero-vector detection
-        self._epsilon = 1e-10
+        self._epsilon = epsilon
         self._loop: int
 
     def solve(self, target: ndarray) -> ndarray:
