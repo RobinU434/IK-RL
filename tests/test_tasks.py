@@ -9,11 +9,8 @@ def test_task_init():
     for n_joints in [1, 2, 50]:
         robot_arm = RobotArm2D(links=np.ones(n_joints), solver_cls=CCD)
         ImitationTask(robot_arm=robot_arm)
-
-    for n_joints in [1, 2, 50]:
-        robot_arm = RobotArm2D(links=np.ones(n_joints), solver_cls=CCD)
-        ReachGoalTask(arm_reach=robot_arm.arm_length)
-
+        
+    ReachGoalTask()
 
 def test_properties_imitation_task():
     num_joints = 2
@@ -30,8 +27,8 @@ def test_properties_imitation_task():
 
     assert task.step_counter == 2
 
-    assert task.done(np.array([2, 0]), np.array([2, 0]))
-    assert not task.done(np.array([2, 0]), np.array([0, 2]))
+    assert task.is_done(np.array([2, 0]), np.array([2, 0]))
+    assert not task.is_done(np.array([2, 0]), np.array([0, 2]))
 
 
 def test_properties_reach_goal():
@@ -46,5 +43,5 @@ def test_properties_reach_goal():
     assert reward == 0
     assert task.step_counter == 1
 
-    assert task.done(np.array([2, 0]), np.array([2, 0]))
-    assert not task.done(np.array([2, 0]), np.array([0, 2]))
+    assert task.is_done(np.array([2, 0]), np.array([2, 0]))
+    assert not task.is_done(np.array([2, 0]), np.array([0, 2]))

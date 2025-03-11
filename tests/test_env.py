@@ -1,42 +1,29 @@
-from ik_rl.environment import InvKinDiscrete, InvKinEnvContinous
-from ik_rl.task import ReachGoalTask
-
+from ik_rl.environment import InvKinDiscrete, InvKinEnvContinuous
 
 def test_init():
     segment_length = 1
     n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    InvKinEnvContinous(task=task, robot_config={"n_joints": n_joints})
-
-    n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    InvKinDiscrete(task=task, robot_config={"n_joints": n_joints})
+    InvKinEnvContinuous(n_joints=n_joints, segment_length=segment_length)
+    InvKinDiscrete(n_joints=n_joints, segment_length=segment_length)
 
 
 def test_reset():
     segment_length = 1
     n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinEnvContinous(task=task, robot_config={"n_joints": n_joints})
+    env = InvKinEnvContinuous(n_joints=n_joints, segment_length=segment_length)
     env.reset()
-
-    n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinDiscrete(task=task, robot_config={"n_joints": n_joints})
+    env = InvKinDiscrete(n_joints=n_joints, segment_length=segment_length)
     env.reset()
 
 
 def test_step():
     segment_length = 1
     n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinEnvContinous(task=task, robot_config={"n_joints": n_joints})
+    env = InvKinEnvContinuous(n_joints=n_joints, segment_length=segment_length)
     action = env.action_space.sample()
     env.step(action)
 
-    n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinDiscrete(task=task, robot_config={"n_joints": n_joints})
+    env = InvKinDiscrete(n_joints=n_joints, segment_length=segment_length)
     action = env.action_space.sample()
     env.step(action)
 
@@ -44,11 +31,7 @@ def test_step():
 def test_render():
     segment_length = 1
     n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinEnvContinous(task=task, robot_config={"n_joints": n_joints})
+    env = InvKinEnvContinuous(n_joints=n_joints, segment_length=segment_length)
     env.render()
-
-    n_joints = 2
-    task = ReachGoalTask(arm_reach=n_joints * segment_length)
-    env = InvKinDiscrete(task=task, robot_config={"n_joints": n_joints})
+    env = InvKinDiscrete(n_joints=n_joints, segment_length=segment_length)
     env.render()
