@@ -1,5 +1,6 @@
 from ik_rl.environment import InvKinDiscrete, InvKinEnvContinuous
 
+
 def test_init():
     segment_length = 1
     n_joints = 2

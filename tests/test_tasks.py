@@ -9,8 +9,9 @@ def test_task_init():
     for n_joints in [1, 2, 50]:
         robot_arm = RobotArm2D(links=np.ones(n_joints), solver_cls=CCD)
         ImitationTask(robot_arm=robot_arm)
-        
+
     ReachGoalTask()
+
 
 def test_properties_imitation_task():
     num_joints = 2

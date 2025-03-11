@@ -11,7 +11,7 @@ class ImitationTask(_BaseTask):
         robot_arm: _RobotArm,
         n_time_steps: int = NUM_TIME_STEPS,
         epsilon: float = 0.01,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(epsilon, n_time_steps, **kwargs)
 

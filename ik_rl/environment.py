@@ -63,7 +63,11 @@ class _InvKinEnv(Env, ABC):
         self._step_counter = 0
 
     def reset(
-        self, *, seed: int | None = None, target_position: ndarray | None = None, rand_arm_angles: bool = False
+        self,
+        *,
+        seed: int | None = None,
+        target_position: ndarray | None = None,
+        rand_arm_angles: bool = False,
     ) -> Tuple[ndarray, dict[str, Any]]:
         """reset the environment.
         Set the step counter to 0
@@ -94,8 +98,8 @@ class _InvKinEnv(Env, ABC):
         self._step_counter = 0
 
         if target_position is None or len(target_position) != 2:
-            msg = f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
-            logging.info(msg)
+            # msg = f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
+            # logging.info(msg)
             self._target_position = sample_target(self._robot_arm.arm_length)
         else:
             self._target_position = target_position
@@ -290,11 +294,9 @@ class InvKinDiscrete(_InvKinEnv):
             available_actions (np.ndarray, optional): set of available actions. Defaults to np.array([-1, 0, 1]).
             relative_angles (bool, optional): Flag to determine if the actions will be seen as absolute actions against angle 0 or relative to the previous joint. Defaults to False.
         """
-        assert (
-            len(available_actions.shape) == 1
-        )  # expect only one dimensional array
+        assert len(available_actions.shape) == 1  # expect only one dimensional array
         self._available_actions = available_actions[None].repeat(n_joints, axis=0)
-        
+
         super().__init__(
             n_steps,
             n_dims,
@@ -382,4 +384,3 @@ class InvKinEnvContinuous(_InvKinEnv):
 
     def _transform_action(self, action: ndarray) -> ndarray:
         return action
-

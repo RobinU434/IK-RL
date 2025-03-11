@@ -10,7 +10,7 @@ class ReachGoalTask(_BaseTask):
         epsilon: float = 0.1,
         n_time_steps: int = NUM_TIME_STEPS,
         bonus: int = 0,
-        **kwargs
+        **kwargs,
     ) -> None:
         """_summary_
 

@@ -8,7 +8,10 @@ from ik_rl.solver.base_solver import _IKSolver
 
 class _RobotArm(ABC):
     def __init__(
-        self, links: ndarray, solver_cls: Type[_IKSolver] = None, solver_args: Dict[str, Any] = {}
+        self,
+        links: ndarray,
+        solver_cls: Type[_IKSolver] = None,
+        solver_args: Dict[str, Any] = {},
     ) -> None:
         super().__init__()
 

@@ -13,7 +13,11 @@ from itertools import product
 
 class CCD(_IKSolver):
     def __init__(
-        self, robot: _RobotArm, max_iter: int = 10000, err_min: float = 0.1, epsilon: float = 1e-10
+        self,
+        robot: _RobotArm,
+        max_iter: int = 10000,
+        err_min: float = 0.1,
+        epsilon: float = 1e-10,
     ) -> None:
         super().__init__(num_joints=robot.n_joints)
         self._robot = robot
