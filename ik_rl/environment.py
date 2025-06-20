@@ -6,7 +6,6 @@ from typing import Any, Dict, Literal, Tuple, Type
 import numpy as np
 import torch
 from gymnasium import Env, spaces
-from gymnasium.error import DependencyNotInstalled
 from gymnasium.spaces import Box
 from ik_rl.plot.plot import plot_arm, plot_base, plot_end_effector, plot_target
 from ik_rl.robots.robot_arm import RobotArm2D, RobotArm3D, _RobotArm
@@ -44,6 +43,7 @@ class _InvKinEnv(Env):
         one_shot: bool = False,
         render_mode: str = None,
         render_size: int = 400,
+        seed: int = None,
     ) -> None:
         super().__init__()
         self._n_steps = n_steps
@@ -55,6 +55,7 @@ class _InvKinEnv(Env):
         self._one_shot = one_shot
         self.render_mode = render_mode
         self._render_size = render_size
+        self.seed = seed
 
         self._robot_arm = self._build_robot(
             n_dims=self._n_dims,
@@ -73,6 +74,8 @@ class _InvKinEnv(Env):
         # render with pygame
         self.screen = None
         self.clock = None
+
+        super().reset(seed=self.seed)
 
     def reset(
         self,
@@ -100,6 +103,8 @@ class _InvKinEnv(Env):
         Returns:
             Tuple[ndarray | dict[str, Any]]: observation containing target position, end effector position, and angles of the arm. Second return type is additional information as a dictionary.
         """
+        if seed is not None:
+            self.seed = seed
         super().reset(seed=seed, options={})
         rel_angles = None
         if rand_arm_angles:
@@ -154,9 +159,14 @@ class _InvKinEnv(Env):
             fig, ax = plt.subplots(figsize=(4, 4))
             ax = plot_base(ax, arm_reach=self._robot_arm.arm_length)
             ax = plot_arm(ax, self._robot_arm)
-            ax = plot_target(ax, target_pos=self._target_position)
+            ax = plot_target(
+                ax, target_pos=self._target_position, epsilon=self._epsilon
+            )
             ax = plot_end_effector(ax, position=self._robot_arm.end_position)
+            dist = np.linalg.norm(self._target_position - self._robot_arm.end_position)
+            ax.set_title(f"{dist:.4f}, {self._step_counter}")
             fig.canvas.draw()
+            plt.close(fig)
             data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
             data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))[..., :3]
             return data
@@ -269,12 +279,13 @@ class _InvKinEnv(Env):
         """
         observation space is a 4 dimensional tensor.
             - first two dimensions: the 2D position of the goal position
-            - second two dimensions: the 2D position of the robot arm tip
+            - second two dimensions: the 2D position of the end effector position
+            - rest relative angels of joints
         """
         return Box(
             -self._robot_arm.arm_length,
             self._robot_arm.arm_length,
-            (2 + 2 + self._robot_arm.n_joints, 1),
+            (2 + 2 + self._robot_arm.n_joints,),
         )
 
     @abstractmethod
@@ -316,7 +327,8 @@ class _InvKinEnv(Env):
 
         obs = np.concatenate(
             (target_position, arm_end_position, self._robot_arm.abs_angles)
-        )[:, None]
+        )
+        obs = obs.astype(np.float32)
 
         return obs
 
@@ -334,11 +346,28 @@ class InvKinDiscrete(_InvKinEnv):
         task=ReachGoalTask,
         task_kwargs=None,
         epsilon=0.01,
-        relative_angles=False,
+        relative_angles=True,
         one_shot=False,
         render_mode=None,
+        render_size=400,
         available_actions: np.ndarray = np.array([-1, 0, 1]),
+        seed=None,
     ):
+        super().__init__(
+            n_steps,
+            n_dims,
+            n_joints,
+            segment_length,
+            robot_kwargs,
+            task,
+            task_kwargs,
+            epsilon,
+            relative_angles,
+            one_shot,
+            render_mode,
+            render_size,
+            seed,
+        )
         """init class
 
         Args:
@@ -363,6 +392,7 @@ class InvKinDiscrete(_InvKinEnv):
             relative_angles,
             one_shot,
             render_mode,
+            seed,
         )
 
     def _build_action_space(self):
@@ -385,7 +415,7 @@ class InvKinDiscrete(_InvKinEnv):
         return action
 
 
-class InvKinEnvContinuous(_InvKinEnv):
+class   InvKinEnvContinuous(_InvKinEnv):
     """send continuous actions to the robot arm."""
 
     def __init__(
@@ -401,6 +431,8 @@ class InvKinEnvContinuous(_InvKinEnv):
         relative_angles=False,
         one_shot=False,
         render_mode=None,
+        render_size=400,
+        seed=None,
     ):
         """init class
 
@@ -423,6 +455,8 @@ class InvKinEnvContinuous(_InvKinEnv):
             relative_angles,
             one_shot,
             render_mode,
+            render_size,
+            seed,
         )
         self._target_position = sample_target(self._robot_arm.arm_length)
 
@@ -437,9 +471,7 @@ class InvKinEnvContinuous(_InvKinEnv):
         Returns:
             Box: build action space on either a discrete action or continuous action space
         """
-        return spaces.Box(0, 2 * np.pi, shape=(self._robot_arm.n_joints,))
+        return spaces.Box(-np.pi, np.pi, shape=(self._robot_arm.n_joints,))
 
     def _transform_action(self, action: ndarray) -> ndarray:
         return action
-
-    
