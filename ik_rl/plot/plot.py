@@ -14,8 +14,11 @@ def plot_base(ax: Axes, arm_reach: float) -> Axes:
     return ax
 
 
-def plot_target(ax: Axes, target_pos: ndarray) -> Axes:
+def plot_target(ax: Axes, target_pos: ndarray, epsilon: float) -> Axes:
+    circle = Circle(tuple(target_pos.tolist()), radius=epsilon, color="red", alpha=0.2)
+    ax.add_patch(p=circle)
     ax.scatter(*target_pos, c="r", s=15)
+
     return ax
 
 
@@ -25,5 +28,5 @@ def plot_arm(ax: Axes, robot: _RobotArm) -> Axes:
 
 
 def plot_end_effector(ax, position: ndarray) -> Axes:
-    ax.scatter(*position, c="green", s=10, zorder=-1)
+    ax.scatter(*position, c="green", s=10, marker="x", zorder=2)
     return ax
