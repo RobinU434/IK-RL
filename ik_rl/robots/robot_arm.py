@@ -4,6 +4,7 @@ from typing import Any, Dict, Tuple, Type
 import numpy as np
 from numpy import ndarray
 from ik_rl.solver.base_solver import _IKSolver
+from ik_rl.utils.geometry import forward_kinematics_2d
 
 
 class _RobotArm(ABC):
@@ -209,6 +210,10 @@ class RobotArm2D(_RobotArm):
         trans = np.eye(3)[None].repeat(num_samples, axis=0)
         trans[:, :trans_dim, -1] = vector
         return trans
+    
+    def forward(self, angles):
+        positions = forward_kinematics_2d(self._links, angles)
+        return positions, None
 
 
 class RobotArm3D(_RobotArm):
