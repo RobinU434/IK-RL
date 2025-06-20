@@ -16,6 +16,7 @@ class NormalizeRewardWrapper(RewardWrapper):
 class ConstrainActionSpaceWrapper(ActionWrapper):
     def __init__(self, env, percentage: float = 1):
         assert isinstance(env, InvKinEnvContinuous), "Only applicable to Continuous environment."
+        self.percentage = percentage
         action_space = Box(
             low=env.action_space.low * percentage,
             high=env.action_space.high * percentage,
@@ -27,5 +28,7 @@ class ConstrainActionSpaceWrapper(ActionWrapper):
         super().__init__(env)
         
     def action(self, action):
-        assert self.env.action_space.contains(action)
+        # assert action in original space
+        # down or upscale action 
+        action = self.percentage * action
         return action
