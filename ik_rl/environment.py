@@ -57,14 +57,14 @@ class _InvKinEnv(Env):
         self._render_size = render_size
         self.seed = seed
 
-        self._robot_arm = self._build_robot(
+        self.robot_arm = self._build_robot(
             n_dims=self._n_dims,
             n_joints=self._n_joints,
             segment_length=self._segment_length,
             robot_kwargs=robot_kwargs,
         )
         self._task = self._build_task(task, task_kwargs)
-        self._target_position = sample_target(self._robot_arm.arm_length)
+        self._target_position = sample_target(self.robot_arm.arm_length)
 
         self.action_space = self._build_action_space()
         self.observation_space = self._build_observation_space()
@@ -108,8 +108,8 @@ class _InvKinEnv(Env):
         super().reset(seed=seed, options={})
         rel_angles = None
         if rand_arm_angles:
-            rel_angles = np.random.rand(self._robot_arm.n_joints) * 2 * np.pi
-        self._robot_arm.reset(rel_angles)
+            rel_angles = np.random.rand(self.robot_arm.n_joints) * 2 * np.pi
+        self.robot_arm.reset(rel_angles)
         self._task.reset()
 
         self._step_counter = 0
@@ -117,7 +117,7 @@ class _InvKinEnv(Env):
         if target_position is None or len(target_position) != 2:
             # msg = f"Sample target in env.reset(). Given target position is not sufficiant: {target_position=}"
             # logging.info(msg)
-            self._target_position = sample_target(self._robot_arm.arm_length)
+            self._target_position = sample_target(self.robot_arm.arm_length)
         else:
             self._target_position = target_position
 
@@ -132,9 +132,9 @@ class _InvKinEnv(Env):
 
         # calculate reward
         kwargs = {
-            "arm_position": self._robot_arm.end_position,
+            "arm_position": self.robot_arm.end_position,
             "target_position": self._target_position,
-            "robot_arm_angles": self._robot_arm.abs_angles,
+            "robot_arm_angles": self.robot_arm.abs_angles,
         }
         reward = self._task.reward(**kwargs)
 
@@ -143,7 +143,7 @@ class _InvKinEnv(Env):
 
         # determine if the env is done
         truncated, done = self._task.is_done(
-            arm_position=self._robot_arm.end_position,
+            arm_position=self.robot_arm.end_position,
             target_position=self._target_position,
         )
 
@@ -157,13 +157,13 @@ class _InvKinEnv(Env):
         """
         if self._n_dims == 2:
             fig, ax = plt.subplots(figsize=(4, 4))
-            ax = plot_base(ax, arm_reach=self._robot_arm.arm_length)
-            ax = plot_arm(ax, self._robot_arm)
+            ax = plot_base(ax, arm_reach=self.robot_arm.arm_length)
+            ax = plot_arm(ax, self.robot_arm)
             ax = plot_target(
                 ax, target_pos=self._target_position, epsilon=self._epsilon
             )
-            ax = plot_end_effector(ax, position=self._robot_arm.end_position)
-            dist = np.linalg.norm(self._target_position - self._robot_arm.end_position)
+            ax = plot_end_effector(ax, position=self.robot_arm.end_position)
+            dist = np.linalg.norm(self._target_position - self.robot_arm.end_position)
             ax.set_title(f"{dist:.4f}, {self._step_counter}")
             fig.canvas.draw()
             plt.close(fig)
@@ -268,7 +268,7 @@ class _InvKinEnv(Env):
             args = {**args, **task_kwargs}
 
         if task_type == ImitationTask:
-            args = {**args, "robot_arm": self._robot_arm}
+            args = {**args, "robot_arm": self.robot_arm}
         return task_type(**args)
 
     @abstractmethod
@@ -283,9 +283,9 @@ class _InvKinEnv(Env):
             - rest relative angels of joints
         """
         return Box(
-            -self._robot_arm.arm_length,
-            self._robot_arm.arm_length,
-            (2 + 2 + self._robot_arm.n_joints,),
+            -self.robot_arm.arm_length,
+            self.robot_arm.arm_length,
+            (2 + 2 + self.robot_arm.n_joints,),
         )
 
     @abstractmethod
@@ -299,12 +299,12 @@ class _InvKinEnv(Env):
             action (ndarray): continuous action shape: ()
         """
         action = self._transform_action(action)
-        action = self._robot_arm.rel_angles * (1 - self._one_shot) + action  # type: ignore
+        action = self.robot_arm.rel_angles * (1 - self._one_shot) + action  # type: ignore
 
         if self._relative_angles:
-            self._robot_arm.set_rel_angles(action)
+            self.robot_arm.set_rel_angles(action)
         else:  # alternative are absolute angles
-            self._robot_arm.set_abs_angles(action)
+            self.robot_arm.set_abs_angles(action)
 
     def _observe(self, normalize: bool = False) -> ndarray:
         """build an observation of the environment to the current time step.
@@ -319,14 +319,14 @@ class _InvKinEnv(Env):
         """
         if normalize:
             # normalize observations
-            target_position = self._target_position / self._robot_arm.arm_length
-            arm_end_position = self._robot_arm.end_position / self._robot_arm.arm_length
+            target_position = self._target_position / self.robot_arm.arm_length
+            arm_end_position = self.robot_arm.end_position / self.robot_arm.arm_length
         else:
             target_position = self._target_position
-            arm_end_position = self._robot_arm.end_position
+            arm_end_position = self.robot_arm.end_position
 
         obs = np.concatenate(
-            (target_position, arm_end_position, self._robot_arm.abs_angles)
+            (target_position, arm_end_position, self.robot_arm.abs_angles)
         )
         obs = obs.astype(np.float32)
 
@@ -396,7 +396,7 @@ class InvKinDiscrete(_InvKinEnv):
         )
 
     def _build_action_space(self):
-        n_vec = np.ones(self._robot_arm.n_joints) * self._available_actions.shape[1]
+        n_vec = np.ones(self.robot_arm.n_joints) * self._available_actions.shape[1]
         return spaces.MultiDiscrete(nvec=n_vec)
 
     def _transform_action(self, action: ndarray) -> ndarray:
@@ -428,7 +428,7 @@ class   InvKinEnvContinuous(_InvKinEnv):
         task=ReachGoalTask,
         task_kwargs=None,
         epsilon=0.01,
-        relative_angles=False,
+        relative_actions=False,
         one_shot=False,
         render_mode=None,
         render_size=400,
@@ -452,13 +452,13 @@ class   InvKinEnvContinuous(_InvKinEnv):
             task,
             task_kwargs,
             epsilon,
-            relative_angles,
+            relative_actions,
             one_shot,
             render_mode,
             render_size,
             seed,
         )
-        self._target_position = sample_target(self._robot_arm.arm_length)
+        self._target_position = sample_target(self.robot_arm.arm_length)
 
         self.action_space = self._build_action_space()
         self.observation_space = self._build_observation_space()
@@ -471,7 +471,7 @@ class   InvKinEnvContinuous(_InvKinEnv):
         Returns:
             Box: build action space on either a discrete action or continuous action space
         """
-        return spaces.Box(-np.pi, np.pi, shape=(self._robot_arm.n_joints,))
+        return spaces.Box(-np.pi, np.pi, shape=(self.robot_arm.n_joints,))
 
     def _transform_action(self, action: ndarray) -> ndarray:
         return action
